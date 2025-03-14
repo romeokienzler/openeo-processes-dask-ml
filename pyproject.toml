@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "openeo-processes-dask-ml"
+version = "0.1.0"
+description = "Implementation for openEO ML processes, built to extend openeo-processes-dask"
+authors = ["Jonas Hurst <jhurst@uni-muenster.de>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">3.10,<3.12"
+openeo-processes-dask = {extras = ["implementations"], version = "^2025.2.1"}
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
