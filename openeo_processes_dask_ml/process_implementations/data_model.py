@@ -102,7 +102,7 @@ class MLModelInputStructure:
         self.data_type = data_type
 
 
-class MLModelOutputStructure:
+class MLModelResultStructure:
     def __init__(
             self,
             shape: list[int],
@@ -118,7 +118,7 @@ class MLModelInput:
     def __init__(
             self,
             name: str,
-            bands: Union[list[str], list[MLModelBand], list[dict]],
+            bands: Union[list[MLModelBand], list[str], list[dict]],
             input: Union[MLModelInputStructure, dict],
             description: str = None,
             value_scaling: str = None,  # todo: value scaling object
@@ -134,15 +134,15 @@ class MLModelInput:
             raise NotImplementedError("pre_processing_function currently not implemented.")
 
         # resolve dicts to objects
-        if type(input) is list:
+        if type(input) is dict:
             input = MLModelInputStructure(**input)
 
         # a list of strings is given for bands parameter
-        if isinstance(bands, list) and all(isinstance(item, str) for item in a):
+        if isinstance(bands, list) and all(isinstance(item, str) for item in bands):
             bands = [MLModelBand(band_value) for band_value in bands]
 
         # a list of dicts is given as bands parameter
-        if isinstance(bands, list) and all(isinstance(item, dict) for item in a):
+        if isinstance(bands, list) and all(isinstance(item, dict) for item in bands):
             bands = [MLModelBand(**band_value) for band_value in bands]
 
         self.name = name
@@ -159,7 +159,7 @@ class MLModelOutput:
             self,
             name: str,
             tasks: list[task_enum],
-            result: Union[MLModelOutputStructure, dict],
+            result: Union[MLModelResultStructure, dict],
             description: str = None,
             classification_classes: int = None,  # todo: classification extension
             post_processing_function: str = None   # todo preprocessing expression
@@ -172,11 +172,11 @@ class MLModelOutput:
 
         # resolve dict to object
         if type(result) is dict:
-            result = MLModelOutputStructure(**result)
+            result = MLModelResultStructure(**result)
 
         self.name = name
         self.tasks = tasks
-        self.results = result
+        self.result = result
         self.description = description
         self.classificaiton_classes = classification_classes
         self.post_processing_function = post_processing_function
@@ -229,6 +229,14 @@ class MLModel(ABC):
         self.hyperparameters = hyperparameters
 
     @abstractmethod
+    def run_model(self):
+        pass
+
+
+class DummyMLModel(MLModel):
+    """
+    Dummy model for testing of the abstract MLModel class
+    """
     def run_model(self):
         pass
 
