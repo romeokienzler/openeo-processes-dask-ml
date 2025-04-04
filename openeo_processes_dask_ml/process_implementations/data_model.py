@@ -1,254 +1,162 @@
-from typing import Literal, Union
+import pystac
+from pystac.extensions.mlm import MLMExtension
+
+from typing import Any
 from abc import ABC, abstractmethod
+import requests
+from io import BytesIO
+import sys
 
-task_enum = Literal[
-    "regression",
-    "classification",
-    "scene-classification",
-    "detection",
-    "object-detection",
-    "segmentation",
-    "semantic-segmentation",
-    "instance-segmentation",
-    "panoptic-segmentation",
-    "similarity-search",
-    "generative",
-    "image-captioning",
-    "super-resolution"
-]
-
-framework_enum = Literal[
-    "PyTorch",
-    "TensorFlow",
-    "scikit-learn",
-    "Hugging Face",
-    "Keras",
-    "ONNX",
-    "rgeo",
-    "spatialRF",
-    "JAX",
-    "FLAX",
-    "MXNet",
-    "Caffe",
-    "PyMC",
-    "Weka",
-    "Paddle"
-]  # keep in mind that these are only recommendations
-
-accelerator_enum = Literal[
-    "amd64",
-    "cuda",
-    "xla",
-    "amd-rocm",
-    "intel-ipex-cpu",
-    "intel-ipex-gpu",
-    "macos-arm"
-]  # keep in mind that these are only recommendations
-
-dimension_name_enum = Literal[
-    "batch",
-    "channel",
-    "time",
-    "height",
-    "width",
-    "depth",
-    "token",
-    "class",
-    "score",
-    "confidence"
-]  # recommended values only!
-
-data_type_enum = Literal[
-    "int8",
-    "int16",
-    "int32",
-    "int64",
-    "uint8",
-    "uint16",
-    "uint32",
-    "uint64",
-    "float16",
-    "float32",
-    "float64",
-    "cint16",
-    "cint32",
-    "cfloat32",
-    "cfloat64",
-    "other"  # e.g. boolean, string, higher-precision number
-]  # values taken from https://github.com/radiantearth/stac-spec/blob/master/commons/common-metadata.md#data-types
-
-
-class MLModelBand:
-    def __init__(
-            self,
-            name: str,
-            format: str = None,
-            expression=None
-    ):
-        self.name = name
-        self.format = format
-        self.expression = expression
-
-
-class MLModelInputStructure:
-    def __init__(
-            self,
-            shape: list[int],
-            dim_order: list[dimension_name_enum],
-            data_type: data_type_enum
-    ):
-        self.shape = shape
-        self.dim_order = dim_order
-        self.data_type = data_type
-
-
-class MLModelResultStructure:
-    def __init__(
-            self,
-            shape: list[int],
-            dim_order: list[data_type_enum],
-            data_type: data_type_enum
-    ):
-        self.shape = shape
-        self.dim_order = dim_order
-        self.data_type = data_type
-
-
-class MLModelInput:
-    def __init__(
-            self,
-            name: str,
-            bands: Union[list[MLModelBand], list[str], list[dict]],
-            input: Union[MLModelInputStructure, dict],
-            description: str = None,
-            value_scaling: str = None,  # todo: value scaling object
-            resize_type: str = None,  # todo: resize enum
-            pre_processing_function: str = None  # todo: preprocessing expression
-    ):
-
-        if value_scaling is not None:
-            raise NotImplementedError("value_scaling currently not implemented")
-        if resize_type is not None:
-            raise NotImplementedError("resize_type currently not implemented")
-        if pre_processing_function is not None:
-            raise NotImplementedError("pre_processing_function currently not implemented.")
-
-        # resolve dicts to objects
-        if type(input) is dict:
-            input = MLModelInputStructure(**input)
-
-        # a list of strings is given for bands parameter
-        if isinstance(bands, list) and all(isinstance(item, str) for item in bands):
-            bands = [MLModelBand(band_value) for band_value in bands]
-
-        # a list of dicts is given as bands parameter
-        if isinstance(bands, list) and all(isinstance(item, dict) for item in bands):
-            bands = [MLModelBand(**band_value) for band_value in bands]
-
-        self.name = name
-        self.bands = bands
-        self.input = input
-        self.description = description
-        self.value_scaling = value_scaling
-        self.resize_type = resize_type
-        self.pre_processing_function = pre_processing_function
-
-
-class MLModelOutput:
-    def __init__(
-            self,
-            name: str,
-            tasks: list[task_enum],
-            result: Union[MLModelResultStructure, dict],
-            description: str = None,
-            classification_classes: int = None,  # todo: classification extension
-            post_processing_function: str = None   # todo preprocessing expression
-    ):
-
-        if classification_classes is not None:
-            raise NotImplementedError("classification_classes currently not supported")
-        if post_processing_function is not None:
-            raise NotImplementedError("post_processing_function currently not supported")
-
-        # resolve dict to object
-        if type(result) is dict:
-            result = MLModelResultStructure(**result)
-
-        self.name = name
-        self.tasks = tasks
-        self.result = result
-        self.description = description
-        self.classificaiton_classes = classification_classes
-        self.post_processing_function = post_processing_function
+# todo: replace sys.out.write() and print() with logger actions
 
 
 class MLModel(ABC):
-    def __init__(
-            self,
-            name: str,
-            architecture: str,
-            task: list[task_enum],
-            input: Union[MLModelInput, dict],
-            output: Union[MLModelOutput, dict],
-            framework: framework_enum = None,
-            framework_version: str = None,
-            memory_size: int = None,
-            total_parameters: int = None,
-            pretrained: bool = None,
-            pretrained_source: str = None,
-            batch_size_suggestion: int = None,
-            accelerator: accelerator_enum = None,
-            accelerator_constrained: bool = None,
-            accelerator_summary: str = None,
-            accelerator_count: int = None,
-            hyperparameters: dict = None,  # open JSON object
-            **kwargs
-    ):
-        # resolve dict input to objects
-        if type(input) is dict:
-            input = MLModelInput(**input)
-        if type(output) is dict:
-            output = MLModelOutput(**output)
+    stac_item: pystac.Item
 
-        self.name = name
-        self.architecture = architecture
-        self.task = task
-        self.input = input
-        self.output = output
-        self.framework = framework
-        self.framework_version = framework_version
-        self.memory_size = memory_size
-        self.total_parameters = total_parameters
-        self.pretrained = pretrained
-        self.pretrained_source = pretrained_source
-        self.batch_size_suggestion = batch_size_suggestion
-        self.accelerator = accelerator
-        self.accelerator_constrained = accelerator_constrained
-        self.accelerator_summary = accelerator_summary
-        self.accelerator_count = accelerator_count
-        self.hyperparameters = hyperparameters
+    def __init__(self, stac_item: pystac.Item = None):
+        self.stac_item = stac_item
+        self._model_object = None
+
+    @property
+    def model_metadata(self) -> MLMExtension:
+        # todo: account for if metadata is stored with the asset
+        return MLMExtension.ext(self.stac_item)
+
+    def _get_model_asset(self, asset_name: str = None) -> pystac.Asset:
+        """
+        Determine which asset holds the model (has mlm:model in roles)
+        Determines whcih asset to use if multiple assets with role mlm:models are found
+        :param asset_name:
+        :return:
+        """
+        assets = self.stac_item.assets
+        model_assets = {
+            key: assets[key] for key in assets if "mlm:model" in assets[key].roles
+        }
+
+        # case 1: no assets with mlm:model role
+        if not model_assets:
+            raise Exception(
+                "The given STAC Item does not have an asset with role mlm:model"
+            )
+
+        # case 2: asset_name is given
+        if asset_name:
+            if asset_name in model_assets:
+                return model_assets[asset_name]
+            else:
+                raise Exception(
+                    f"Provided STAC Item does not have an asset named {asset_name} which "
+                    f"also lists mlm:model as its asset role"
+                )
+
+        # case 3: asset name is not given and there is only one mlm:model asset
+        if len(model_assets) == 1:
+            return next(iter(model_assets.values()))
+
+        # case 4: asset name is not given and multiple assets with mlm:model esit
+        # -> go by convention
+        default_asset_names = ["weights", "model", "mlm:model"]
+        for default_asset_name in default_asset_names:
+            if default_asset_name in model_assets:
+                return model_assets[default_asset_name]
+
+        # case 5: multiple mlm:model exist, none is calle "weights"
+        # -> make a decision on which one to use
+        raise Exception(
+            "Multiple assets with role=mlm:model are found in the provided STAC-Item. "
+            "Please sepcify which one to use."
+        )
+
+    @staticmethod
+    def _download_model_http(url) -> BytesIO:
+        chunk_size = 8192
+
+        file_in_memory = BytesIO()
+        total_size = 0
+
+        try:
+            # Use stream=True to avoid loading the whole content into memory at once
+            with requests.get(url, stream=True, timeout=30) as response:
+                # Raise an exception for bad status codes (4xx or 5xx)
+                response.raise_for_status()
+
+                # Check for Content-Length header to estimate size (optional)
+                content_length = response.headers.get('content-length')
+                if content_length:
+                    total_expected_size = int(content_length)
+                    print(f"Downloading {url}")
+                    print(
+                        f"Total expected size: {total_expected_size / (1024 * 1024):.2f} MB")
+                else:
+                    total_expected_size = None
+                    print(f"Downloading {url} (size unknown)")
+
+                # Iterate over the response data in chunks
+                for chunk in response.iter_content(chunk_size=chunk_size):
+
+                    if chunk:  # filter out keep-alive new chunks
+                        file_in_memory.write(chunk)
+                        total_size += len(chunk)
+                        # Optional: Print progress
+                        if total_expected_size:
+                            done = int(50 * total_size / total_expected_size)
+                            sys.stdout.write(
+                                f"\r[{'=' * done}{' ' * (50 - done)}] {total_size / (1024 * 1024):.2f} MB / {total_expected_size / (1024 * 1024):.2f} MB")
+                            sys.stdout.flush()
+
+                        else:
+                            sys.stdout.write(
+                                f"\rDownloaded: {total_size / (1024 * 1024):.2f} MB")
+                            sys.stdout.flush()
+
+            print("\nDownload complete.")  # Newline after progress bar
+
+            # IMPORTANT: Reset the stream position to the beginning
+            # so it can be read from the start.
+            file_in_memory.seek(0)
+
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"\nError downloading {url}: {e}")
+
+        except Exception as e:
+            raise Exception(f"\nAn unexpected error occurred: {e}")
+
+        return file_in_memory
+
+    def _download_model_s3(self, url) -> BytesIO:
+        pass
+
+    def _download_model(self, asset_name=None):
+
+        model_asset = self._get_model_asset(asset_name)
+        url = model_asset.href
+        protocol = url.split("://")[0]
+
+        # download the model
+        if protocol == "http" or protocol == "https":
+            self._download_model_http(url)
+        elif protocol == "s3":
+            self._download_model_s3(url)
+
+        # save it to disk? Store it in RAM?
+        # Both so we can use it immediately and we are able to re-usee the model?
+        # First look if the downloaded asset is already on disk disk and only DL if if is not there?
+
+        # Return the File object (or path)? Or save it in a variable?
+
+    @abstractmethod
+    def create_object(self):
+        # convert to object (in derived chilc classes
+        pass
 
     @abstractmethod
     def run_model(self):
         pass
 
 
-class DummyMLModel(MLModel):
-    """
-    Dummy model for testing of the abstract MLModel class
-    """
-    def run_model(self):
-        pass
-
-
 class ONNXModel(MLModel):
-    def run_model(self):
+    def create_object(self):
         pass
 
 
-if __name__ == "__main__":
-    a = [{1:1, 2:1}, {1:4, 4:2}]
-    if isinstance(a, list) and all(isinstance(item, dict) for item in a):
-        print("yes")
-    else:
-        print("No")
