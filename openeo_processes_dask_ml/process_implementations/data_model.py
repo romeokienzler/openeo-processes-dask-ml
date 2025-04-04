@@ -159,4 +159,5 @@ class ONNXModel(MLModel):
     def create_object(self):
         pass
 
-
+    def run_model(self):
+        pass
