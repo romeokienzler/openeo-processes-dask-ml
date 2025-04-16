@@ -4,7 +4,7 @@ import requests.exceptions
 from stac_validator.validate import StacValidate
 
 
-def load_ml_model(uri: str):
+def load_ml_model(uri: str, model_asset: str = None):
     if type(uri) is not str:
         raise ValueError("Type of URI parameter must be a string.")
 
