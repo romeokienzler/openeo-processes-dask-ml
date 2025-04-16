@@ -13,7 +13,7 @@ import sys
 class MLModel(ABC):
     stac_item: pystac.Item
 
-    def __init__(self, stac_item: pystac.Item = None):
+    def __init__(self, stac_item: pystac.Item):
         self.stac_item = stac_item
         self._model_object = None
 
