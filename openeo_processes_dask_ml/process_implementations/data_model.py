@@ -54,15 +54,7 @@ class MLModel(ABC):
         if len(model_assets) == 1:
             return next(iter(model_assets.values()))
 
-        # case 4: asset name is not given and multiple assets with mlm:model esit
-        # -> go by convention
-        default_asset_names = ["weights", "model", "mlm:model"]
-        for default_asset_name in default_asset_names:
-            if default_asset_name in model_assets:
-                return model_assets[default_asset_name]
-
-        # case 5: multiple mlm:model exist, none is calle "weights"
-        # -> make a decision on which one to use
+        # case 4: multiple mlm:model exist but asset_name is not specified
         raise Exception(
             "Multiple assets with role=mlm:model are found in the provided STAC-Item. "
             "Please sepcify which one to use."
