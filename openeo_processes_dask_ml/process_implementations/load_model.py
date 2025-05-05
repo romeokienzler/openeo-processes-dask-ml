@@ -1,3 +1,6 @@
+import json
+from typing import Any
+import os
 import re
 import requests
 import requests.exceptions
@@ -14,12 +17,7 @@ except ModuleNotFoundError:
     pass
 
 
-def load_ml_model(uri: str, model_asset: str = None) -> MLModel:
-    if type(uri) is not str:
-        raise ValueError("Type of URI parameter must be a string.")
-
-    # todo: uri could be a local URI
-
+def _load_stac_from_remote(uri: str) -> dict[str, Any]:
     # fetch STAC Item
     r = requests.get(uri)
     if r.status_code != 200:
@@ -32,6 +30,35 @@ def load_ml_model(uri: str, model_asset: str = None) -> MLModel:
         stac = r.json()
     except requests.exceptions.JSONDecodeError:
         raise Exception("The provided URI does not point to a valid JSON file")
+
+    return stac
+
+
+def _load_stac_from_local(uri: str) -> dict[str, Any]:
+    if not os.path.exists(uri):
+        raise Exception(
+            f"Could not locate file for the URI provided: {uri}"
+        )
+
+    with open(uri, "r") as file:
+        try:
+            stac = json.load(file)
+        except json.decoder.JSONDecodeError:
+            raise Exception("The provided URI does not point to a valid JSON file")
+
+        return stac
+
+
+def load_ml_model(uri: str, model_asset: str = None) -> MLModel:
+    if type(uri) is not str:
+        raise ValueError("Type of URI parameter must be a string.")
+
+    if uri.startswith("http://") or uri.startswith("https://"):
+        # uri is an url that points to a STAC
+        stac = _load_stac_from_remote(uri)
+    else:
+        # assume uri points to a local file
+        stac = _load_stac_from_local(uri)
 
     # check if downloaded JSON is valid STAC
     stac_validator = StacValidate()
