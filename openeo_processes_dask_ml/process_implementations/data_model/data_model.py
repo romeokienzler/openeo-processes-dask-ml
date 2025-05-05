@@ -133,6 +133,7 @@ class MLModel(ABC):
 
         # save it to disk? Store it in RAM?
         # Both so we can use it immediately and we are able to re-usee the model?
+        # todo: use caching!
         # First look if the downloaded asset is already on disk disk and only DL if if is not there?
 
         # Return the File object (or path)? Or save it in a variable?
@@ -143,13 +144,5 @@ class MLModel(ABC):
         pass
 
     @abstractmethod
-    def run_model(self):
-        pass
-
-
-class ONNXModel(MLModel):
-    def create_object(self):
-        pass
-
     def run_model(self):
         pass
