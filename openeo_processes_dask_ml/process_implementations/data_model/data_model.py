@@ -1,11 +1,15 @@
+import os.path
+
 import pystac
 from pystac.extensions.mlm import MLMExtension
-
 from typing import Any
 from abc import ABC, abstractmethod
 import requests
 from io import BytesIO
 import sys
+
+from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
+from openeo_processes_dask_ml.process_implementations.utils import model_cache_utils
 
 # todo: replace sys.out.write() and print() with logger actions
 
@@ -61,11 +65,13 @@ class MLModel(ABC):
         )
 
     @staticmethod
-    def _download_model_http(url) -> BytesIO:
+    def _download_model_http(url: str, target_path: str) -> BytesIO:
         chunk_size = 8192
 
         file_in_memory = BytesIO()
         total_size = 0
+
+        # todo: download to disk instead of RAM
 
         try:
             # Use stream=True to avoid loading the whole content into memory at once
@@ -116,27 +122,40 @@ class MLModel(ABC):
 
         return file_in_memory
 
-    def _download_model_s3(self, url) -> BytesIO:
+    def _download_model_s3(self, url: str, target_path: str) -> BytesIO:
+        # todo: implement s3 download
         pass
 
-    def _download_model(self, asset_name=None):
-
-        model_asset = self._get_model_asset(asset_name)
-        url = model_asset.href
+    def _download_model(self, url: str, target_path: str):
         protocol = url.split("://")[0]
 
         # download the model
         if protocol == "http" or protocol == "https":
-            self._download_model_http(url)
+            self._download_model_http(url, target_path)
         elif protocol == "s3":
-            self._download_model_s3(url)
+            self._download_model_s3(url, target_path)
 
-        # save it to disk? Store it in RAM?
-        # Both so we can use it immediately and we are able to re-usee the model?
-        # todo: use caching!
-        # First look if the downloaded asset is already on disk disk and only DL if if is not there?
+    def _get_model(self, asset_name=None) -> str:
+        model_asset = self._get_model_asset(asset_name)
+        url = model_asset.href
 
-        # Return the File object (or path)? Or save it in a variable?
+        # encode URL to directory name and file name
+        model_dir_name = model_cache_utils.url_to_dir_string(url)
+        model_file_name = model_cache_utils.url_to_dir_string(url.split("/")[-1])
+
+        model_cache_dir = os.path.join(MODEL_CACHE_DIR, model_dir_name)
+        model_cache_file = os.path.join(model_cache_dir, model_file_name)
+
+        # check if model file has been downloaded to cache already
+        if os.path.exists(model_cache_file):
+            return model_cache_file
+
+        # check if directory exists already in cache and create if not
+        if not os.path.exists(model_cache_dir):
+            os.mkdir(model_cache_dir)
+
+        self._download_model(url, model_cache_file)
+        return model_cache_file
 
     @abstractmethod
     def create_object(self):
