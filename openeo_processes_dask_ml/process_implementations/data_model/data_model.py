@@ -112,10 +112,7 @@ class MLModel(ABC):
                             #         f"\rDownloaded: {total_size / (1024 * 1024):.2f} MB")
                             #     sys.stdout.flush()
 
-            print("\nDownload complete.")  # Newline after progress bar
-
-            # IMPORTANT: Reset the stream position to the beginning
-            # so it can be read from the start.
+            # print("\nDownload complete.")  # Newline after progress bar
 
         except requests.exceptions.RequestException as e:
             raise Exception(f"\nError downloading {url}: {e}")
