@@ -3,12 +3,17 @@ import os
 import re
 
 
-def url_to_dir_string(s: str) -> str:
+def url_to_dir_string(s: str, preserve_file_extension: bool = False) -> str:
     """
     Transform a string and sanitizes it to be used as a directory name
     :param s: The string to be sanitized
     :return: The sanitized string
     """
+    if preserve_file_extension:
+        prefix = s.split(".")[-1]
+        s = ".".join(s.split(".")[:-1])
+    else:
+        prefix = ""
 
     sanitized_name = re.sub(r'[\\/:*?"<>|$&;,=#.\s]', '_', s)
 
@@ -31,6 +36,9 @@ def url_to_dir_string(s: str) -> str:
 
     # You might also want to truncate very long names if needed,
     # although modern OSes support quite long paths.
+
+    if prefix:
+        sanitized_name = sanitized_name + "." + prefix
 
     return sanitized_name
 
