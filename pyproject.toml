@@ -8,11 +8,19 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">3.10,<3.12"
 openeo-processes-dask = {extras = ["implementations"], version = "^2025.2.1"}
+boto3 = "^1.38.14"
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
+pytest-mock = "^3.14.0"
+pytest-recording = "^0.13.4"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+#filterwarnings = ["error"]
+#addopts = "--block-network --record-mode=none"
+addopts = "--block-network --record-mode=new_episodes"
