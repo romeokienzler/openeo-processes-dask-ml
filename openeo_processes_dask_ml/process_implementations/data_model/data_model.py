@@ -120,7 +120,8 @@ class MLModel(ABC):
         except Exception as e:
             raise Exception(f"\nAn unexpected error occurred: {e}")
 
-    def _download_model_s3(self, url: str, target_path: str):
+    @staticmethod
+    def _download_model_s3(url: str, target_path: str):
         object_path = url[5:].split("/")  # remove s3://, then split by /
         bucket_name = object_path.pop(0)
         object_key = "/".join(object_path)
