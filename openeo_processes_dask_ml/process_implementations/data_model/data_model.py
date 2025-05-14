@@ -1,5 +1,7 @@
 import os.path
 
+import botocore.exceptions
+
 import pystac
 from pystac.extensions.mlm import MLMExtension
 from typing import Any
@@ -7,8 +9,14 @@ from abc import ABC, abstractmethod
 import requests
 from io import BytesIO
 import sys
+import boto3
+from botocore import UNSIGNED
+from botocore.config import Config
 
-from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
+from openeo_processes_dask_ml.process_implementations.constants import (
+    MODEL_CACHE_DIR, S3_MODEL_REPO_ENDPOINT, S3_MODEL_REPO_ACCESS_KEY_ID,
+    S3_MODEL_REPO_SECRET_ACCESS_KEY
+)
 from openeo_processes_dask_ml.process_implementations.utils import model_cache_utils
 
 # todo: replace sys.out.write() and print() with logger actions
@@ -65,54 +73,49 @@ class MLModel(ABC):
         )
 
     @staticmethod
-    def _download_model_http(url: str, target_path: str) -> BytesIO:
+    def _download_model_http(url: str, target_path: str):
         chunk_size = 8192
 
-        file_in_memory = BytesIO()
         total_size = 0
 
         # todo: download to disk instead of RAM
 
         try:
-            # Use stream=True to avoid loading the whole content into memory at once
             with requests.get(url, stream=True, timeout=30) as response:
-                # Raise an exception for bad status codes (4xx or 5xx)
                 response.raise_for_status()
 
                 # Check for Content-Length header to estimate size (optional)
-                content_length = response.headers.get('content-length')
-                if content_length:
-                    total_expected_size = int(content_length)
-                    print(f"Downloading {url}")
-                    print(
-                        f"Total expected size: {total_expected_size / (1024 * 1024):.2f} MB")
-                else:
-                    total_expected_size = None
-                    print(f"Downloading {url} (size unknown)")
+                # content_length = response.headers.get('content-length')
+                # if content_length:
+                #     total_expected_size = int(content_length)
+                #     print(f"Downloading {url}")
+                #     print(f"Total expected size: {total_expected_size / (1024 * 1024):.2f} MB")
+                # else:
+                #     total_expected_size = None
+                #     print(f"Downloading {url} (size unknown)")
 
-                # Iterate over the response data in chunks
-                for chunk in response.iter_content(chunk_size=chunk_size):
-
-                    if chunk:  # filter out keep-alive new chunks
-                        file_in_memory.write(chunk)
-                        total_size += len(chunk)
-                        # Optional: Print progress
-                        if total_expected_size:
-                            done = int(50 * total_size / total_expected_size)
-                            sys.stdout.write(
-                                f"\r[{'=' * done}{' ' * (50 - done)}] {total_size / (1024 * 1024):.2f} MB / {total_expected_size / (1024 * 1024):.2f} MB")
-                            sys.stdout.flush()
-
-                        else:
-                            sys.stdout.write(
-                                f"\rDownloaded: {total_size / (1024 * 1024):.2f} MB")
-                            sys.stdout.flush()
+                with open(target_path, "wb") as f:
+                    # Iterate over the response data in chunks
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:  # filter out keep-alive new chunks
+                            f.write(chunk)
+                            # total_size += len(chunk)
+                            # # Optional: Print progress
+                            # if total_expected_size:
+                            #     done = int(50 * total_size / total_expected_size)
+                            #     sys.stdout.write(
+                            #         f"\r[{'=' * done}{' ' * (50 - done)}] {total_size / (1024 * 1024):.2f} MB / {total_expected_size / (1024 * 1024):.2f} MB")
+                            #     sys.stdout.flush()
+                            #
+                            # else:
+                            #     sys.stdout.write(
+                            #         f"\rDownloaded: {total_size / (1024 * 1024):.2f} MB")
+                            #     sys.stdout.flush()
 
             print("\nDownload complete.")  # Newline after progress bar
 
             # IMPORTANT: Reset the stream position to the beginning
             # so it can be read from the start.
-            file_in_memory.seek(0)
 
         except requests.exceptions.RequestException as e:
             raise Exception(f"\nError downloading {url}: {e}")
@@ -120,11 +123,37 @@ class MLModel(ABC):
         except Exception as e:
             raise Exception(f"\nAn unexpected error occurred: {e}")
 
-        return file_in_memory
+    def _download_model_s3(self, url: str, target_path: str):
+        #, aws_access_key_id = ..., aws_secret_access_key = ...
+        object_path = url[5:].split("/")  # remove s3://, then split by /
+        bucket_name = object_path.pop(0)
+        object_key = "/".join(object_path)
 
-    def _download_model_s3(self, url: str, target_path: str) -> BytesIO:
-        # todo: implement s3 download
-        pass
+        try:
+            if S3_MODEL_REPO_ACCESS_KEY_ID and S3_MODEL_REPO_SECRET_ACCESS_KEY:
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=S3_MODEL_REPO_ACCESS_KEY_ID,
+                    aws_secret_access_key=S3_MODEL_REPO_SECRET_ACCESS_KEY,
+                    endpoint_url=S3_MODEL_REPO_ENDPOINT
+                )
+            else:
+                s3 = boto3.client(
+                    's3',
+                    endpoint_url=S3_MODEL_REPO_ENDPOINT,
+                    config=Config(signature_version=UNSIGNED)
+                )
+            s3.download_file(bucket_name, object_key, target_path)
+
+        except FileNotFoundError:
+            raise Exception(
+                f"Could not locate file with {object_key=} in {bucket_name=}"
+            )
+
+        except botocore.exceptions.ClientError:
+            raise Exception(
+                f"Error connecting to s3 storage to download model"
+            )
 
     def _download_model(self, url: str, target_path: str):
         protocol = url.split("://")[0]
