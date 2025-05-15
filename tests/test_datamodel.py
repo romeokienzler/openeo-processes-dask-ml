@@ -104,6 +104,7 @@ def mlm_item(
 
     return blank_stac_item
 
+
 def test_correct_asset_selection(blank_stac_item, random_asset, mlm_model_asset) -> None:
     d = DummyMLModel(blank_stac_item)
     with pytest.raises(Exception):
