@@ -5,6 +5,7 @@ import pytest
 import pystac
 from openeo_processes_dask_ml.process_implementations.data_model import MLModel
 from vcr.cassette import Cassette
+from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
 
 
 def prepare_tmp_folder(dir_path: str = "./tmp", file_name: str = "file.bin") -> tuple[str, str]:
@@ -68,6 +69,40 @@ def mlm_model_asset(random_asset: pystac.Asset) -> pystac.Asset:
         ["mlm:model"]
     )
 
+@pytest.fixture
+def mlm_item(
+        blank_stac_item: pystac.Item, mlm_model_asset: pystac.Asset
+) -> pystac.Item:
+    blank_stac_item.properties["mlm:name"] = "Test"
+    blank_stac_item.properties["mlm:architecture"] = "CNN"
+    blank_stac_item.properties["mlm:tasks"] = "classification"
+
+    inp = {
+        "name": "test",
+        "bands": [],
+        "input": {
+            "shape": [-1, 4, 224, 224],
+            "dim_order": ["batch", "channel", "width", "height"],
+            "data_type": "float64"
+        }
+    }
+    outp = {
+        "name": "classification",
+        "tasks": ["classification"],
+        "result": {
+            "shape": [-1, 1, 1, 1],
+            "dim_order": ["batch", "channel", "width", "height"],
+            "data_type": "uint8"
+        }
+    }
+
+    blank_stac_item.properties["mlm:input"] = [inp]
+    blank_stac_item.properties["mlm:output"] = [outp]
+
+    mlm_model_asset.href = "https://filesamples.com/samples/font/bin/slick.bin"
+    blank_stac_item.add_asset("weights", mlm_model_asset)
+
+    return blank_stac_item
 
 def test_correct_asset_selection(blank_stac_item, random_asset, mlm_model_asset) -> None:
     d = DummyMLModel(blank_stac_item)
@@ -180,3 +215,18 @@ def test_download_model(
     assert actual_content == expected_content
 
     clear_tmp_folder()
+
+
+@pytest.mark.vcr()
+def test_get_model(mlm_item: pystac.Item):
+    d = DummyMLModel(mlm_item)
+    model_file_path = d._get_model()
+
+    print(model_file_path)
+    assert os.path.exists(model_file_path)
+
+    # should not download the mdoel again as it is cached
+    model_file_path = d._get_model()
+
+    os.remove(model_file_path)
+    os.rmdir(MODEL_CACHE_DIR)
