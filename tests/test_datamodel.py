@@ -218,15 +218,23 @@ def test_download_model(
 
 
 @pytest.mark.vcr()
-def test_get_model(mlm_item: pystac.Item):
+def test_get_model(mlm_item: pystac.Item, monkeypatch):
+    mock_opener: unittest.mock.MagicMock = unittest.mock.mock_open()
+
+    monkeypatch.setattr("builtins.open", mock_opener)
+    monkeypatch.setattr("os.makedirs", lambda x: None)
+
     d = DummyMLModel(mlm_item)
     model_file_path = d._get_model()
 
-    print(model_file_path)
-    assert os.path.exists(model_file_path)
+    # assert that the method was called once
+    mock_opener.assert_called_once()
+
+    # mock path exists to use
+    monkeypatch.setattr("os.path.exists", lambda x: True)
 
     # should not download the mdoel again as it is cached
     model_file_path = d._get_model()
 
-    os.remove(model_file_path)
-    os.rmdir(MODEL_CACHE_DIR)
+    # assert that the method was STILL called only once (cached file exists)
+    mock_opener.assert_called_once()
