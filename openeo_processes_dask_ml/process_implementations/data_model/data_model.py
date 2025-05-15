@@ -167,7 +167,7 @@ class MLModel(ABC):
 
         # encode URL to directory name and file name
         model_dir_name = model_cache_utils.url_to_dir_string(url)
-        model_file_name = model_cache_utils.url_to_dir_string(url.split("/")[-1])
+        model_file_name = model_cache_utils.url_to_dir_string(url.split("/")[-1], True)
 
         model_cache_dir = os.path.join(MODEL_CACHE_DIR, model_dir_name)
         model_cache_file = os.path.join(model_cache_dir, model_file_name)
@@ -178,7 +178,7 @@ class MLModel(ABC):
 
         # check if directory exists already in cache and create if not
         if not os.path.exists(model_cache_dir):
-            os.mkdir(model_cache_dir)
+            os.makedirs(model_cache_dir)
 
         self._download_model(url, model_cache_file)
         return model_cache_file
