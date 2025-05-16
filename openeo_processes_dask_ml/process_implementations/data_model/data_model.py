@@ -4,11 +4,8 @@ import botocore.exceptions
 
 import pystac
 from pystac.extensions.mlm import MLMExtension
-from typing import Any
 from abc import ABC, abstractmethod
 import requests
-from io import BytesIO
-import sys
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
