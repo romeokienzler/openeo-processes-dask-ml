@@ -73,6 +73,9 @@ def mlm_model_asset(random_asset: pystac.Asset) -> pystac.Asset:
 def mlm_item(
         blank_stac_item: pystac.Item, mlm_model_asset: pystac.Asset
 ) -> pystac.Item:
+    blank_stac_item.stac_extensions.append(
+        "https://stac-extensions.github.io/mlm/v1.4.0/schema.json"
+    )
     blank_stac_item.properties["mlm:name"] = "Test"
     blank_stac_item.properties["mlm:architecture"] = "CNN"
     blank_stac_item.properties["mlm:tasks"] = "classification"
