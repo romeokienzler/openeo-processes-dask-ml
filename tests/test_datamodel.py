@@ -3,9 +3,13 @@ import unittest.mock
 from datetime import datetime
 import pytest
 import pystac
-from openeo_processes_dask_ml.process_implementations.data_model import MLModel
+
 from vcr.cassette import Cassette
 from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
+import xarray as xr
+import dask.array as da
+
+from tests.dummy.dummy_ml_model import DummyMLModel
 
 
 def prepare_tmp_folder(dir_path: str = "./tmp", file_name: str = "file.bin") -> tuple[str, str]:
@@ -22,15 +26,6 @@ def clear_tmp_folder(dir_path: str = "./tmp", file_name: str = "file.bin"):
     os.remove(file_path)
     os.rmdir(dir_path)
 
-
-class DummyMLModel(MLModel):
-    # Only for testing purposes
-
-    def create_object(self):
-        pass
-
-    def run_model(self):
-        pass
 
 @pytest.fixture
 def blank_stac_item() -> pystac.Item:
