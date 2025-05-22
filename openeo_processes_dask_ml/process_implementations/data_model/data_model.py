@@ -10,11 +10,17 @@ import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
 
+import xarray as xr
+
 from openeo_processes_dask_ml.process_implementations.constants import (
     MODEL_CACHE_DIR, S3_MODEL_REPO_ENDPOINT, S3_MODEL_REPO_ACCESS_KEY_ID,
     S3_MODEL_REPO_SECRET_ACCESS_KEY
 )
 from openeo_processes_dask_ml.process_implementations.utils import model_cache_utils
+
+from openeo_processes_dask.process_implementations.exceptions import (
+    DimensionMissing, DimensionMismatch
+)
 
 # todo: replace sys.out.write() and print() with logger actions
 
@@ -22,8 +28,9 @@ from openeo_processes_dask_ml.process_implementations.utils import model_cache_u
 class MLModel(ABC):
     stac_item: pystac.Item
 
-    def __init__(self, stac_item: pystac.Item):
+    def __init__(self, stac_item: pystac.Item, model_asset_name: str = None):
         self.stac_item = stac_item
+        self._model_asset_name = model_asset_name
         self._model_object = None
 
     @property
@@ -179,6 +186,151 @@ class MLModel(ABC):
 
         self._download_model(url, model_cache_file)
         return model_cache_file
+
+    def get_datacube_dimension_mapping(self, datacube: xr.DataArray) -> list[None|tuple[str,int]]:
+        """
+        Maps the model input dimension names to datacube dimension names, as dimension
+        names can sometimes differ, e.g. t -> time
+        :param datacube: The datacube to map the dimeions agains
+        :return: Dict containing the model dimsnion names as keys and datacube
+        dimension names as values. Value is None if a match could not be found.
+        """
+        model_dims = self.model_metadata.input[0].input.dim_order
+        dc_dims = datacube.dims
+
+        def get_dc_dim_name(model_dim_name: str) -> str|None:
+            if model_dim_name in dc_dims:
+                return model_dim_name
+
+            t_dim_names = ["time", "times", "t", "date", "dates", "DATE"]
+            if model_dim_name in t_dim_names:
+                return next((t_dim for t_dim in t_dim_names if t_dim in dc_dims), None)
+
+            b_dim_names = ["band", "bands", "b", "channel", "channels"]
+            if model_dim_name in b_dim_names:
+                return next((b_dim for b_dim in b_dim_names if b_dim in dc_dims), None)
+
+            x_dim_names = ["x", "lon", "lng", "longitude"]
+            if model_dim_name in x_dim_names:
+                return next((x_dim for x_dim in x_dim_names if x_dim in dc_dims), None)
+
+            y_dim_names = ["y", "lat", "latitude"]
+            if model_dim_name in y_dim_names:
+                return next((y_dim for y_dim in y_dim_names if y_dim in dc_dims), None)
+
+            return None
+
+        dim_mapping = []
+        for m_dim_name in model_dims:
+
+            dc_dim_name = get_dc_dim_name(m_dim_name)
+            if dc_dim_name is None:
+                dim_mapping.append(None)
+            else:
+                dim_mapping.append((dc_dim_name, dc_dims.index(dc_dim_name)))
+
+        return dim_mapping
+
+    def _check_dimensions_present_in_datacube(
+            self, datacube: xr.DataArray, ignore_batch_dim: bool = False
+    ) -> None:
+        """
+        Checkl whether the datacube contains all dimensions required by the model input
+        :param datacube: The datacube to be checked
+        :param ignore_batch_dim: Ignore a missing "batch" dimension in the datacube
+        :raise DimensionMissing: Raised when a dimension requqired by the model input
+        is missing
+        :return: None
+        """
+
+        input_dims = self.model_metadata.input[0].input.dim_order
+        dim_mapping = self.get_datacube_dimension_mapping(datacube)
+
+        unmatched_dims = [input_dims[i] for i, d in enumerate(dim_mapping) if d is None]
+
+        # check if all model input dimensions could be matched to dc dimensions
+        # ignore batch dimension, we will take care of this later
+        if ignore_batch_dim and "batch" in unmatched_dims:
+            unmatched_dims.remove("batch")
+        if any(unmatched_dims):
+            raise DimensionMissing(
+                f"Datacube is missing the following dimensions required by the "
+                f"STAC-MLM Input: {', '.join(unmatched_dims)}"
+            )
+
+    def _check_datacube_dimension_size(
+            self, datacube: xr.DataArray, ignore_batch_dim: bool = False
+    ) -> None:
+        """
+        Check whether each datacube dimension is long enough to satisfy the model
+        input requriements
+        :param datacube: The datacube to be checked
+        :param ignore_batch_dim: Ignore a missing "batch" dimension in the datacube
+        :raise DimensionMismatch: raised when a datacube dimension has fewer
+        coordinates than requried by the model input
+        :return: None
+        """
+
+        input_dims = self.model_metadata.input[0].input.dim_order
+        dim_mapping = self.get_datacube_dimension_mapping(datacube)
+
+        input_shape = self.model_metadata.input[0].input.shape  # e.g. [-1, 3, 128, 128]
+        dc_shape = datacube.shape  # e.g. (12, 1000, 1000, 5)
+
+        # reorder dc_shape to match input_shape
+        # xor: (a and not b) or (not a and b)
+        dc_shape_reorder = [
+            dc_shape[dim_mapping[i][1]] for i, inp_dim in enumerate(input_dims)
+            if inp_dim != "batch" or (inp_dim == "batch" and not ignore_batch_dim)
+        ]
+
+        # ignore "batch" dimension for now, we will take care of that later
+        input_shape_reorder = [
+            d for i, d in zip(input_dims, input_shape)
+            if i != "batch" or (i == "batch" and not ignore_batch_dim)
+        ]
+
+        # check whether dc shape is big enough to suffice input:
+        # input size must be smaller than dc size in every input dimension
+        # todo: ignore -1 input vaules
+        for dc_dim_size, inp_dim_size in zip(dc_shape_reorder, input_shape_reorder):
+            if inp_dim_size == -1:
+                # -1 as input shape size means all values are allowed
+                # e.g. batch=-1 means the models allows for arbitrary batch size
+                continue
+            if dc_dim_size >= inp_dim_size:
+                continue
+            raise DimensionMismatch(
+                "The model input requires dimension DIM_NAME to have X values. "
+                "The datacube only has Y values for dimension DIM_NAME."
+            )
+
+    def check_datacube_dimensions(
+            self, datacube: xr.DataArray, ignore_batch_dim: bool = False
+    ) -> None:
+        """
+        Check whether the datacube has all dimensions which the model requires.
+        :param datacube: The datacube to check
+        :param ignore_batch_dim: Ignore a missing "batch" dimension in the datacube
+        :raise DimensionMissing: When the stac:mlm item requires an input dimension
+        that is not present in the datacube
+        :raise DimensionMismatch: When a dimension is smaller in the datacube than
+        required by the stac:mlm input shape
+        :return:
+        """
+
+        self._check_dimensions_present_in_datacube(datacube, ignore_batch_dim)
+        self._check_datacube_dimension_size(datacube, ignore_batch_dim)
+
+        # todo: check bands dimension
+
+    @abstractmethod
+    def preprocess_datacube(self):
+        pass
+
+    @abstractmethod
+    def postprocess_datacube(self):
+        pass
 
     @abstractmethod
     def create_object(self):
