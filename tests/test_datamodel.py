@@ -1,6 +1,7 @@
 import os
 import unittest.mock
 from datetime import datetime
+from typing import Type
 import pytest
 import pystac
 
@@ -11,6 +12,9 @@ import dask.array as da
 
 from tests.dummy.dummy_ml_model import DummyMLModel
 
+from openeo_processes_dask.process_implementations.exceptions import (
+    DimensionMissing, DimensionMismatch
+)
 
 def prepare_tmp_folder(dir_path: str = "./tmp", file_name: str = "file.bin") -> tuple[str, str]:
     file_path = dir_path + "/" + file_name
@@ -237,3 +241,134 @@ def test_get_model(mlm_item: pystac.Item, monkeypatch):
 
     # assert that the method was STILL called only once (cached file exists)
     mock_opener.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "model_dim_names, dc_dim_names, idx",
+    (
+        (("bands", "x", "y", "time"), ("band", "x", "y", "time"), (0, 1, 2, 3)),
+        (("band", "x", "y", "time"), ("band", "lon", "lat", "t"), (0, 1, 2, 3)),
+        (("t", "x", "y", "channel"), ("band", "x", "y", "time"), (3, 1, 2, 0)),
+        (("x", "y", "asdf"), ("x", "y", "bands", "t"), (0, 1, None)),
+    )
+)
+def test_get_datacube_dimension_mapping(
+        mlm_item: pystac.Item,
+        model_dim_names: tuple[str],
+        dc_dim_names: tuple[str],
+        idx: list[int|None]
+):
+    d = DummyMLModel(mlm_item)
+    mlm_item.ext.mlm.input[0].input.dim_order = model_dim_names
+
+    cube = xr.DataArray(
+        da.random.random((1,1,1,1)),
+        dims=dc_dim_names
+    )
+
+    mapping = d.get_datacube_dimension_mapping(cube)
+    assert len(idx) == len(mapping)
+    assert len(model_dim_names) == len(mapping)
+
+    for i, model_dim_name in enumerate(model_dim_names):
+
+        if mapping[i] is not None:
+            mapped_dim_name = mapping[i][0]
+            map_idx = mapping[i][1]
+            assert mapped_dim_name == dc_dim_names[map_idx]
+
+
+@pytest.mark.parametrize(
+    "dc_dims, ignore_batch, valid",
+    (
+        (["batch", "channel", "width", "height"], True, True),
+        (["asdf", "channel", "width", "height"], False, False),
+        (["batch", "channel", "width", "asdf"], True, False),
+        (["batch", "channel", "width", "asdf"], False, False),
+    )
+)
+def test_check_dimensions_present_in_datacube(
+    mlm_item: pystac.Item,
+    dc_dims: list[str],
+    ignore_batch: bool,
+    valid: bool
+):
+    d = DummyMLModel(mlm_item)
+    dc = xr.DataArray(
+        da.random.random((1,1,1,1)),
+        dims=dc_dims
+    )
+
+    if valid:
+        d._check_dimensions_present_in_datacube(dc, ignore_batch)
+    else:
+        with pytest.raises(DimensionMissing):
+            d._check_dimensions_present_in_datacube(dc, ignore_batch)
+
+
+@pytest.mark.parametrize(
+    "dc_shape, ignore_batch, valid",
+    (
+        ([10, 4, 224, 224], False, True),
+        ([10, 4, 224, 224], True, True),
+        ([10, 10, 230, 230], True, True),
+        ([10, 10, 230, 230], False, True),
+        ([10, 10, 230, 230], True, True),
+        ([10, 2, 230, 230], True, False),
+        ([10, 10, 15, 230], False, False),
+    )
+)
+def test_check_datacube_dimension_size(
+    mlm_item: pystac.Item,
+    dc_shape: list[int],
+    ignore_batch: bool,
+    valid: bool
+):
+    d = DummyMLModel(mlm_item)
+    dc_dims = ["batch", "channel", "width", "height"]
+
+    dc = xr.DataArray(
+        da.random.random(dc_shape),
+        dims=dc_dims
+    )
+    if valid:
+        d._check_datacube_dimension_size(dc, ignore_batch)
+    else:
+        with pytest.raises(DimensionMismatch):
+            d._check_datacube_dimension_size(dc, ignore_batch)
+
+@pytest.mark.parametrize(
+    "dc_dims, dc_dim_shp, exception_raised",
+    (
+        (("time", "x", "y", "bands"), (4, 1000, 1000, 8), None),
+        (("x", "y", "t", "bands"), (1000, 1000, 4, 8), None),
+        (("times", "x", "y", "channel"), (4, 1000, 1000, 8), None),
+        (("time", "x", "y"), (4, 1000, 1000), DimensionMissing),
+        (("time", "x", "y", "bands"), (4, 100, 100, 8), DimensionMismatch)
+    )
+)
+def test_check_datacube_dimensions(
+        mlm_item: pystac.Item,
+        dc_dims: list[str],
+        dc_dim_shp: list[int],
+        exception_raised: Type[Exception]
+):
+    dc = xr.DataArray(
+        da.random.random(dc_dim_shp),
+        dims=dc_dims
+    )
+
+    assert len(dc_dim_shp) == len(dc_dim_shp)
+
+    mlm_item.ext.mlm.input[0].input.shape = (-1, 1, 128, 128, 4)
+    mlm_item.ext.mlm.input[0].input.dim_order = ("batch", "time", "x", "y", "bands")
+
+    d = DummyMLModel(mlm_item)
+
+    if exception_raised is None:
+        # positive tests: should work flawlessly
+        d.check_datacube_dimensions(dc, True)
+    else:
+        # negative test: when an exception is raised
+        with pytest.raises(exception_raised):
+            d.check_datacube_dimensions(dc, True)
