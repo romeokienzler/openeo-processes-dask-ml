@@ -7,3 +7,4 @@ poetry.lock
 pystac
 cache
 tests/tmp
+models
