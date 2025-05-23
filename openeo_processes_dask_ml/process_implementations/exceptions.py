@@ -1,0 +1,5 @@
+from openeo_processes_dask.process_implementations.exceptions import OpenEOException
+
+
+class LabelDoesNotExist(OpenEOException):
+    pass
