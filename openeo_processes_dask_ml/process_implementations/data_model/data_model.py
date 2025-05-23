@@ -292,7 +292,6 @@ class MLModel(ABC):
 
         # check whether dc shape is big enough to suffice input:
         # input size must be smaller than dc size in every input dimension
-        # todo: ignore -1 input vaules
         for dc_dim_size, inp_dim_size in zip(dc_shape_reorder, input_shape_reorder):
             if inp_dim_size == -1:
                 # -1 as input shape size means all values are allowed
