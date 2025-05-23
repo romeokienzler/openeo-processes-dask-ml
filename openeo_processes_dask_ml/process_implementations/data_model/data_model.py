@@ -414,19 +414,53 @@ class MLModel(ABC):
 
         # todo: check bands dimension
 
-    @abstractmethod
-    def preprocess_datacube(self):
+    def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
+        self.check_datacube_dimensions(datacube)
+
+        # todo: was tun wenn DC extra dimensionen hat? Öfters anwenden entlang der dimension?
+        # todo: z.b. model hat x,y; cube hat x,y,t: Anwenden für jeden Zeitschritt
+
+        self.check_datacube_dimensions(datacube)
+
+        if self._model_object is None:
+            self.create_object()
+
+        pre_datacube = self.preprocess_datacube(datacube)
+
+        # todo: datacube rechunk?
+        # todo: datacube in Einzelteile hacken, zu batches zusammenfassen
+
+        b = None  # dummy variable for batches, will be properly filled later
+        result = self.execute_model(b)
+
+        post_cube = self.postprocess_datacube(result)
+
+        return post_cube
+
+    def preprocess_datacube(self, datacube: xr.DataArray) -> xr.DataArray:
+        # todo: datacube compute new bands?
+        # todo: datacube value scaling
+        # todo: datacube value preprocessing
+        # todo: datacube padding?
         pass
 
-    @abstractmethod
-    def postprocess_datacube(self):
+    def postprocess_datacube(self, result_cube) -> xr.DataArray:
+        # todo: output gemäß mlm-spec post-processing transformieren
+        # todo: output zu neuem datacube zusammenführen
         pass
 
-    @abstractmethod
     def create_object(self):
-        # convert to object (in derived chilc classes
+        if self._model_object is not None:
+            # model object has already been created
+            return
+
+        model_filepath = self._get_model(self._model_asset_name)
+        self.create_model_object(model_filepath)
+
+    @abstractmethod
+    def create_model_object(self, filepath: str):
         pass
 
     @abstractmethod
-    def run_model(self):
+    def execute_model(self, batch):
         pass
