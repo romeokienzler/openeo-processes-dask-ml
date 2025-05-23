@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Type
 import pytest
 import pystac
+from pystac.extensions import mlm
 
 from vcr.cassette import Cassette
 from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
@@ -14,6 +15,9 @@ from tests.dummy.dummy_ml_model import DummyMLModel
 
 from openeo_processes_dask.process_implementations.exceptions import (
     DimensionMissing, DimensionMismatch
+)
+from openeo_processes_dask_ml.process_implementations.exceptions import (
+    LabelDoesNotExist
 )
 
 def prepare_tmp_folder(dir_path: str = "./tmp", file_name: str = "file.bin") -> tuple[str, str]:
@@ -336,6 +340,87 @@ def test_check_datacube_dimension_size(
     else:
         with pytest.raises(DimensionMismatch):
             d._check_datacube_dimension_size(dc, ignore_batch)
+
+
+@pytest.mark.parametrize(
+    "m_bands, dc_bands, dc_band_dim_name, exception",
+    (
+        ([], ["B02", "B03"], "band", None),
+        (["B02", "B03"], ["B02", "B03"], "band", None),
+        (["B02", "B03"], ["B02", "B03", "B04"], "band", None),
+        (["B02", "B03"], ["B02", "B03"], "asdf", DimensionMissing),
+        (["B02", "B03"], ["B02", "B04"], "band", LabelDoesNotExist),
+        (
+            [mlm.ModelBand({"name": "B02"}), mlm.ModelBand({"name": "B03"})],
+            ["B02", "B03"],
+            "band",
+            None
+        ),
+        (
+            [mlm.ModelBand({"name": "B02"}), mlm.ModelBand({"name": "B03"})],
+            ["B02", "B03", "B04"],
+            "band",
+            None
+        ),
+        (
+            [mlm.ModelBand({"name": "B02"}), mlm.ModelBand({"name": "B03"})],
+            ["B02", "B04"],
+            "band",
+            LabelDoesNotExist
+        ),
+        (
+            [
+                mlm.ModelBand({"name": "NDVI", "format": "asdf"}),
+                mlm.ModelBand({"name": "B02"})
+            ],
+            ["B02", "B04"],
+            "band",
+            ValueError
+        ),
+        (
+            [
+                mlm.ModelBand({"name": "NDVI", "expression": "asdf"}),
+                mlm.ModelBand({"name": "B02"})
+            ],
+            ["B02", "B04"],
+            "band",
+            ValueError
+        ),
+        (
+            [
+                mlm.ModelBand({"name": "B04"}),
+                mlm.ModelBand({"name": "B08"}),
+                mlm.ModelBand({
+                    "name": "NDVI",
+                    "format": "python",
+                    "expression": "(B08-B04)/(B08+B04)"}
+                )
+            ],
+            ["B04", "B08"],
+            "band",
+            None
+        ),
+    )
+)
+def test_check_datacube_bands(
+        mlm_item: pystac.Item, m_bands: list[str|mlm.ModelBand], dc_bands: list[str],
+        dc_band_dim_name: str, exception: Type[Exception]|None
+):
+    mlm_item.ext.mlm.input[0].bands = m_bands
+    d = DummyMLModel(mlm_item)
+
+    dc = xr.DataArray(
+        da.random.random((1,1,len(dc_bands))),
+        dims=["x", "y", dc_band_dim_name],
+        coords={"x": [1], "y": [1], dc_band_dim_name: dc_bands}
+    )
+
+    if exception is None:
+        d._check_datacube_bands(dc)
+    else:
+        with pytest.raises(exception):
+            d._check_datacube_bands(dc)
+
 
 @pytest.mark.parametrize(
     "dc_dims, dc_dim_shp, exception_raised",
