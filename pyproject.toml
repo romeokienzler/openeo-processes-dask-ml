@@ -15,6 +15,13 @@ boto3 = "^1.38.14"
 pytest = "^8.3.5"
 pytest-mock = "^3.14.0"
 pytest-recording = "^0.13.4"
+matplotlib = "^3.10.3"
+
+
+
+[tool.poetry.group.onnx.dependencies]
+onnxruntime-gpu = "^1.22.0"
+onnx = "^1.18.0"
 
 [build-system]
 requires = ["poetry-core"]
