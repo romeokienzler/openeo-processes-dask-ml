@@ -21,6 +21,9 @@ from openeo_processes_dask_ml.process_implementations.utils import model_cache_u
 from openeo_processes_dask.process_implementations.exceptions import (
     DimensionMissing, DimensionMismatch
 )
+from openeo_processes_dask_ml.process_implementations.exceptions import (
+    LabelDoesNotExist
+)
 
 # todo: replace sys.out.write() and print() with logger actions
 
@@ -304,6 +307,93 @@ class MLModel(ABC):
                 "The datacube only has Y values for dimension DIM_NAME."
             )
 
+    def _check_datacube_bands(self, datacube: xr.DataArray):
+        """
+        Checks if the required input bands for the model are present in the provided
+        `xarray.DataArray` datacube.
+        This function verifies that all bands specified in the `model_metadata.input`
+        are available within the `datacube`. It handles cases where bands might be
+        directly present or need to be computed from other bands.
+        :param datacube: The input data as an `xarray.DataArray`, expected to contain
+        geospatial and spectral data.
+        :raises DimensionMissing: If a 'bands' dimension is required by the model but
+        not found in the datacube, or if the dimension is named unconventionally.
+        :raises ValueError: If a band definition in `model_metadata` has either
+        `format` or `expression` but not both, when a computation is expected.
+        :raises LabelDoesNotExist: If any required band (that cannot be computed) is
+        missing from the datacube.
+        """
+        input_bands = self.model_metadata.input[0].bands
+
+        # bands prorety not utilized, list is empty
+        if not input_bands:
+            return
+
+        # possibilities how the "bands" dimension could be called
+        band_dim_options = ["band", "bands", "b", "channel", "channels"]
+        band_dim_name = None
+        for b in band_dim_options:
+            if b not in datacube.dims:
+                continue
+            band_dim_name = b
+
+        if not band_dim_name:
+            raise DimensionMissing(
+                f"The loaded model requires a bands dimension in its input, but none "
+                f"was found. If this is a mistake, please rename the bands dimension "
+                f"to one of the following: {', '.join(band_dim_options)}"
+            )
+
+        dc_bands = datacube.coords[band_dim_name]
+        band_available_in_datacube: list[bool] = []
+        bands_unavailable: list[str] = []
+        for band in input_bands:
+            if isinstance(band, str):
+                if band in dc_bands:
+                    band_available_in_datacube.append(True)
+                else:
+                    band_available_in_datacube.append(False)
+                    bands_unavailable.append(band)
+
+            else:
+                # this means type(band) must be ModelInput
+                band_name = band.name
+
+                if band_name in dc_bands:
+                    band_available_in_datacube.append(True)
+                    continue
+
+                # two possibilities here:
+                # 1) band not in datacube 2) band must be computed via expression
+                if band.format is None and band.expression is None:
+                    band_available_in_datacube.append(False)
+                    bands_unavailable.append(band_name)
+                    continue
+
+                if (
+                        (band.format is None and band.expression is not None) or
+                        (band.format is not None and band.expression is None)
+                ):
+                    raise ValueError(
+                        f"Properties \"format\" and \"expression\" are both required,"
+                        f"but only one was given for band with name {band_name}."
+                    )
+
+                # if execution gets up to here, it means that bands either available,
+                # or may be computed.
+                # todo: Check if bands involved in computation are available
+                # todo: check if computation is viable
+
+                # if execution of code gets all the way here, this means that the band
+                # is unavailable in the datacube, but can computed from other bands
+                band_available_in_datacube.append(True)
+
+        if not all(band_available_in_datacube):
+            raise LabelDoesNotExist(
+                f"The following bands are unavailable in the datacube, but are "
+                f"required in the model input: {', '.join(bands_unavailable)}"
+            )
+
     def check_datacube_dimensions(
             self, datacube: xr.DataArray, ignore_batch_dim: bool = False
     ) -> None:
@@ -320,6 +410,7 @@ class MLModel(ABC):
 
         self._check_dimensions_present_in_datacube(datacube, ignore_batch_dim)
         self._check_datacube_dimension_size(datacube, ignore_batch_dim)
+        self._check_datacube_bands(datacube)
 
         # todo: check bands dimension
 
