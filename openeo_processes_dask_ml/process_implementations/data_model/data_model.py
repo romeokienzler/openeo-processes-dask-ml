@@ -412,8 +412,6 @@ class MLModel(ABC):
         self._check_datacube_dimension_size(datacube, ignore_batch_dim)
         self._check_datacube_bands(datacube)
 
-        # todo: check bands dimension
-
     def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
         self.check_datacube_dimensions(datacube)
 
