@@ -49,7 +49,7 @@ def _validate_scaling_obj(scale_obj: ValueScaling):
     elif scale_obj.type in [ValueScalingType.OFFSET, ValueScalingType.SCALE]:
         req_props = ["value"]
 
-    elif scale_obj.type == [ValueScalingType.PROCESSING]:
+    elif scale_obj.type == ValueScalingType.PROCESSING:
         req_props = ["format", "expression"]
 
     else:
