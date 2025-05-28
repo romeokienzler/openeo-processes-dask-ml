@@ -56,7 +56,3 @@ def test_scale(dc, scale: ValueScaling, truth: list[list[int]]):
     new_dc = scale_datacube(dc, scale)
     truth_arr = np.array(truth)
     assert (new_dc.data == truth_arr).all()
-
-
-
-
