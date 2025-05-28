@@ -1,6 +1,6 @@
 import pytest
 from openeo_processes_dask_ml.process_implementations.utils.scaling_utils import (
-    scale_datacube
+    scale_datacube, _raise_value_error, _validate_scaling_obj
 )
 from pystac.extensions.mlm import ValueScaling, ValueScalingType
 import xarray as xr
@@ -17,6 +17,46 @@ def dc() -> xr.DataArray:
         dims=["t", "bands"],
         coords={"t": ["t1", "t2"], "bands": ["red", "green"]}
     )
+
+
+def test_raise_value_error():
+    with pytest.raises(ValueError):
+        _raise_value_error("asdf", ["foo", "bar"])
+
+
+@pytest.mark.parametrize(
+    "value_dict, valid",
+    (({"type": "min-max", "minimum": 0, "maximum": 1}, True),
+     ({"type": "min-max", "minimum": 0}, False),
+     ({"type": "min-max", "maximum": 1}, False),
+     ({"type": "min-max"}, False),
+     ({"type": "clip", "minimum": 0, "maximum": 1}, True),
+     ({"type": "clip", "minimum": 0}, False),
+     ({"type": "clip", "maximum": 1}, False),
+     ({"type": "clip"}, False),
+     ({"type": "z-score", "mean": 0, "stddev": 1}, True),
+     ({"type": "z-score", "mean": 0}, False),
+     ({"type": "z-score", "stddev": 1}, False),
+     ({"type": "z-score"}, False),
+     ({"type": "clip-min", "minimum": 1}, True),
+     ({"type": "clip-min"}, False),
+     ({"type": "clip-max", "maximum": 2}, True),
+     ({"type": "clip-max"}, False),
+     ({"type": "offset", "value": 2}, True),
+     ({"type": "offset"}, False),
+     ({"type": "scale", "value": 2}, True),
+     ({"type": "scale"}, False),
+     ({"type": "processing", "format": "a", "expression": "a"}, True),
+     ({"type": "processing", "format": "a"}, False),
+     ({"type": "processing", "expression": "a"}, False))
+)
+def test_test_req_props(value_dict: dict, valid: bool):
+    scale_obj = ValueScaling(value_dict)
+    if valid:
+        _validate_scaling_obj(scale_obj)
+    else:
+        with pytest.raises(ValueError):
+            _validate_scaling_obj(scale_obj)
 
 
 @pytest.mark.parametrize(
