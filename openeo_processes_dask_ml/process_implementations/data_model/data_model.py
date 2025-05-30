@@ -1,22 +1,16 @@
 import os.path
 
-import botocore.exceptions
-
 import pystac
 from pystac.extensions.mlm import MLMExtension
 from abc import ABC, abstractmethod
-import requests
-import boto3
-from botocore import UNSIGNED
-from botocore.config import Config
 
 import xarray as xr
 
-from openeo_processes_dask_ml.process_implementations.constants import (
-    MODEL_CACHE_DIR, S3_MODEL_REPO_ENDPOINT, S3_MODEL_REPO_ACCESS_KEY_ID,
-    S3_MODEL_REPO_SECRET_ACCESS_KEY
+from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
+
+from openeo_processes_dask_ml.process_implementations.utils import (
+    model_cache_utils, download_utils, scaling_utils
 )
-from openeo_processes_dask_ml.process_implementations.utils import model_cache_utils
 
 from openeo_processes_dask.process_implementations.exceptions import (
     DimensionMissing, DimensionMismatch
@@ -24,8 +18,6 @@ from openeo_processes_dask.process_implementations.exceptions import (
 from openeo_processes_dask_ml.process_implementations.exceptions import (
     LabelDoesNotExist
 )
-
-# todo: replace sys.out.write() and print() with logger actions
 
 
 class MLModel(ABC):
@@ -79,94 +71,14 @@ class MLModel(ABC):
             "Please sepcify which one to use."
         )
 
-    @staticmethod
-    def _download_model_http(url: str, target_path: str):
-        chunk_size = 8192
-
-        total_size = 0
-
-        # todo: download to disk instead of RAM
-
-        try:
-            with requests.get(url, stream=True, timeout=30) as response:
-                response.raise_for_status()
-
-                # Check for Content-Length header to estimate size (optional)
-                # content_length = response.headers.get('content-length')
-                # if content_length:
-                #     total_expected_size = int(content_length)
-                #     print(f"Downloading {url}")
-                #     print(f"Total expected size: {total_expected_size / (1024 * 1024):.2f} MB")
-                # else:
-                #     total_expected_size = None
-                #     print(f"Downloading {url} (size unknown)")
-
-                with open(target_path, "wb") as f:
-                    # Iterate over the response data in chunks
-                    for chunk in response.iter_content(chunk_size=chunk_size):
-                        if chunk:  # filter out keep-alive new chunks
-                            f.write(chunk)
-                            # total_size += len(chunk)
-                            # # Optional: Print progress
-                            # if total_expected_size:
-                            #     done = int(50 * total_size / total_expected_size)
-                            #     sys.stdout.write(
-                            #         f"\r[{'=' * done}{' ' * (50 - done)}] {total_size / (1024 * 1024):.2f} MB / {total_expected_size / (1024 * 1024):.2f} MB")
-                            #     sys.stdout.flush()
-                            #
-                            # else:
-                            #     sys.stdout.write(
-                            #         f"\rDownloaded: {total_size / (1024 * 1024):.2f} MB")
-                            #     sys.stdout.flush()
-
-            # print("\nDownload complete.")  # Newline after progress bar
-
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"\nError downloading {url}: {e}")
-
-        except Exception as e:
-            raise Exception(f"\nAn unexpected error occurred: {e}")
-
-    @staticmethod
-    def _download_model_s3(url: str, target_path: str):
-        object_path = url[5:].split("/")  # remove s3://, then split by /
-        bucket_name = object_path.pop(0)
-        object_key = "/".join(object_path)
-
-        try:
-            if S3_MODEL_REPO_ACCESS_KEY_ID and S3_MODEL_REPO_SECRET_ACCESS_KEY:
-                s3 = boto3.client(
-                    's3',
-                    aws_access_key_id=S3_MODEL_REPO_ACCESS_KEY_ID,
-                    aws_secret_access_key=S3_MODEL_REPO_SECRET_ACCESS_KEY,
-                    endpoint_url=S3_MODEL_REPO_ENDPOINT
-                )
-            else:
-                s3 = boto3.client(
-                    's3',
-                    endpoint_url=S3_MODEL_REPO_ENDPOINT,
-                    config=Config(signature_version=UNSIGNED)
-                )
-            s3.download_file(bucket_name, object_key, target_path)
-
-        except FileNotFoundError:
-            raise Exception(
-                f"Could not locate file with {object_key=} in {bucket_name=}"
-            )
-
-        except botocore.exceptions.ClientError:
-            raise Exception(
-                f"Error connecting to s3 storage to download model"
-            )
-
     def _download_model(self, url: str, target_path: str):
         protocol = url.split("://")[0]
 
         # download the model
         if protocol == "http" or protocol == "https":
-            self._download_model_http(url, target_path)
+            download_utils.download_http(url, target_path)
         elif protocol == "s3":
-            self._download_model_s3(url, target_path)
+            download_utils.download_s3(url, target_path)
 
     def _get_model(self, asset_name=None) -> str:
         model_asset = self._get_model_asset(asset_name)
@@ -435,9 +347,48 @@ class MLModel(ABC):
 
         return post_cube
 
+    def scale_values(self, datacube: xr.DataArray) -> xr.DataArray:
+        scaling = self.model_metadata.input[0].value_scaling
+
+        band_dim_name = "bands"  # todo: dynamically get name
+
+        if scaling is None:
+            return datacube
+
+        if len(scaling) == 1:
+            # scale all bands the same
+            scale_obj = scaling[0]
+            scaling_utils.scale_datacube(datacube, scale_obj)
+            return datacube
+
+        # if code execution reaches this point, each band is scaled individually
+
+        # assert number of scaling items equals number of bands
+        if len(scaling) != len(datacube.coords[band_dim_name]):
+            raise ValueError(
+                f"Number of ValueScaling entries does not match number of bands in "
+                f"Data Cube. Number of entries: {len(scaling)}; "
+                f"Number of bands: {len(datacube.coords[band_dim_name])}"
+            )
+
+        scaled_bands = []
+        for band_name, scale_obj in zip(datacube.coords[band_dim_name], scaling):
+            scaled_band = scaling_utils.scale_datacube(
+                datacube.sel(**{band_dim_name: band_name}), scale_obj
+            )
+            scaled_bands.append(scaled_band)
+
+        return xr.concat(scaled_bands, dim=band_dim_name)
+
     def preprocess_datacube(self, datacube: xr.DataArray) -> xr.DataArray:
+
+        # processing expression formats
+        # gdal-calc, openeo, rio-calc, python, docker, uri
+
         # todo: datacube compute new bands?
-        # todo: datacube value scaling
+
+        scaled_dc = self.scale_values(datacube)
+
         # todo: datacube value preprocessing
         # todo: datacube padding?
         pass
