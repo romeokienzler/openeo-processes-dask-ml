@@ -9,14 +9,14 @@ import xarray as xr
 from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
 
 from openeo_processes_dask_ml.process_implementations.utils import (
-    model_cache_utils, download_utils, scaling_utils
+    model_cache_utils, download_utils, scaling_utils, proc_expression_utils
 )
 
 from openeo_processes_dask.process_implementations.exceptions import (
     DimensionMissing, DimensionMismatch
 )
 from openeo_processes_dask_ml.process_implementations.exceptions import (
-    LabelDoesNotExist
+    LabelDoesNotExist, ExpressionEvaluationException
 )
 
 
@@ -379,6 +379,19 @@ class MLModel(ABC):
             scaled_bands.append(scaled_band)
 
         return xr.concat(scaled_bands, dim=band_dim_name)
+
+    def preprocess_datacube_expression(self, datacube: xr.DataArray):
+        pre_proc_expression = self.model_metadata.input[0].pre_processing_function
+        if pre_proc_expression is None:
+            return datacube
+
+        try:
+            proc_expression_utils.run_process_expression(datacube, pre_proc_expression)
+        except ExpressionEvaluationException as e:
+            raise Exception(
+                f"Error applying pre-processing function to datacube: {str(e)}"
+            )
+        return proc_expression_utils
 
     def preprocess_datacube(self, datacube: xr.DataArray) -> xr.DataArray:
 

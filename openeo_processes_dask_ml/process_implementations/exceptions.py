@@ -3,3 +3,7 @@ from openeo_processes_dask.process_implementations.exceptions import OpenEOExcep
 
 class LabelDoesNotExist(OpenEOException):
     pass
+
+
+class ExpressionEvaluationException(OpenEOException):
+    pass
