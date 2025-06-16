@@ -7,3 +7,7 @@ class LabelDoesNotExist(OpenEOException):
 
 class ExpressionEvaluationException(OpenEOException):
     pass
+
+
+class BandNotFoundException(OpenEOException):
+    pass
