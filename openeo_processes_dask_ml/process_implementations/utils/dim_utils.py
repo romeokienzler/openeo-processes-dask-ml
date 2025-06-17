@@ -77,7 +77,7 @@ def get_dc_band_names(dc_band_names: list[str], band_names: list[str]) -> list[s
     """
     Get a list of band coordinates from the datacube that correspond to the list of band
     names submitted to the function, also considering alternative band names
-    :param dc: the datacube
+    :param dc_band_names: band coordinates from the data cube
     :param band_names: the list of band names
     :return: list of band names in data cube
     """
