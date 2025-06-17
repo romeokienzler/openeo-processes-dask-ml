@@ -1,4 +1,5 @@
 import os.path
+import itertools
 
 import pystac
 from pystac.extensions.mlm import MLMExtension
@@ -314,6 +315,59 @@ class MLModel(ABC):
         self._check_dimensions_present_in_datacube(datacube, ignore_batch_dim)
         self._check_datacube_dimension_size(datacube, ignore_batch_dim)
         self._check_datacube_bands(datacube)
+
+    def reshape_dc_for_input(self, dc: xr.DataArray) -> xr.DataArray:
+        """
+        Reshapes a datacube into batches to fit the model's input specification.
+        Input DC must have only dimensions must be equivalent to what is in the model
+        :param dc: The datacube to be reshaped
+        :return: reshaped DC
+        """
+        model_inp_dims = self.model_metadata.input[0].input.dim_order
+        model_inp_shape = self.model_metadata.input[0].input.shape
+
+        dim_mapping = self.get_datacube_dimension_mapping(dc)
+
+        # get new dc dim order and shape without "batch" dim
+        dc_new_dim_order = [d[0] for d in dim_mapping if d is not None]
+        dc_new_input_shape = [
+            dim_len
+            for dim_name, dim_len in zip(model_inp_dims, model_inp_shape)
+            if dim_name != "batch"
+        ]
+
+        # reorder dc dims according to model specification
+        reordered_dc = dc.transpose(*dc_new_dim_order)
+        dc_dims = reordered_dc.dims
+        dc_shape = reordered_dc.shape
+
+        # construct a list of indexes by which the dc will be subsetted lated
+        dim_ranges = []
+        for i in range(len(dc_dims)):
+            step_size = dc_new_input_shape[i]
+            n_steps = dc_shape[i] // dc_new_input_shape[i]
+
+            # end at last full step size, remaining values will be cut off
+            end = n_steps * step_size
+            dim_ranges.append(range(0, end, step_size))
+        idx_list = itertools.product(*dim_ranges)
+
+        # subset dc by indexes to create partial cubes
+        part_cubes = []
+        for idx in idx_list:
+            idxes = {
+                dim_name: range(idx[i], idx[i]+dc_new_input_shape[i])
+                for i, dim_name in enumerate(dc_dims)
+            }
+            dc_part = reordered_dc.isel(**idxes)
+            dc_part = dc_part.expand_dims(
+                dim={"batch": 1},
+                axis=model_inp_dims.index("batch") if "batch" in model_inp_dims else 0)
+            part_cubes.append(dc_part)
+
+        # concat partial cubes by batch dimension
+        batched_cube = xr.concat(part_cubes, dim="batch")
+        return batched_cube
 
     def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
         self.check_datacube_dimensions(datacube)
