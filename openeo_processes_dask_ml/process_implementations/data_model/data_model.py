@@ -383,8 +383,12 @@ class MLModel(ABC):
         pre_datacube = self.preprocess_datacube(datacube)
 
         # todo: datacube rechunk?
-        # todo: datacube in Einzelteile hacken, zu batches zusammenfassen
 
+        input_dc = self.reshape_dc_for_input(pre_datacube)
+
+        # todo: iterate over all other DC dimensions
+
+        # todo: call execute_model function
         b = None  # dummy variable for batches, will be properly filled later
         result = self.execute_model(b)
 
