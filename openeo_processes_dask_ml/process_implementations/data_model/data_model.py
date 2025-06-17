@@ -107,8 +107,7 @@ class MLModel(ABC):
         Maps the model input dimension names to datacube dimension names, as dimension
         names can sometimes differ, e.g. t -> time
         :param datacube: The datacube to map the dimeions agains
-        :return: Dict containing the model dimsnion names as keys and datacube
-        dimension names as values. Value is None if a match could not be found.
+        :return: Tuple with dc-equivalent model input dimension names and their index
         """
         model_dims = self.model_metadata.input[0].input.dim_order
         dc_dims = datacube.dims
