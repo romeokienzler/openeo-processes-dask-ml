@@ -72,15 +72,6 @@ class MLModel(ABC):
             "Please sepcify which one to use."
         )
 
-    def _download_model(self, url: str, target_path: str):
-        protocol = url.split("://")[0]
-
-        # download the model
-        if protocol == "http" or protocol == "https":
-            download_utils.download_http(url, target_path)
-        elif protocol == "s3":
-            download_utils.download_s3(url, target_path)
-
     def _get_model(self, asset_name=None) -> str:
         model_asset = self._get_model_asset(asset_name)
         url = model_asset.href
@@ -100,7 +91,7 @@ class MLModel(ABC):
         if not os.path.exists(model_cache_dir):
             os.makedirs(model_cache_dir)
 
-        self._download_model(url, model_cache_file)
+        download_utils.download(url, model_cache_file)
         return model_cache_file
 
     def get_datacube_dimension_mapping(self, datacube: xr.DataArray) -> list[None|tuple[str,int]]:

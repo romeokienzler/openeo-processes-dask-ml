@@ -167,20 +167,18 @@ interactions:
         AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
         AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     headers:
-      Age:
-      - '84665'
       CF-RAY:
-      - 93f9720c08b2f805-DUS
+      - 9511a4e8efedf809-DUS
       Cache-Control:
       - public, max-age=604800
       Cf-Cache-Status:
-      - HIT
+      - MISS
       Connection:
       - keep-alive
       Content-Type:
       - application/octet-stream
       Date:
-      - Wed, 14 May 2025 09:42:25 GMT
+      - Tue, 17 Jun 2025 09:50:42 GMT
       Display:
       - staticcontent_sol
       Etag:
@@ -190,7 +188,7 @@ interactions:
       Nel:
       - '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}'
       Report-To:
-      - '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=Wv%2BiBA%2BYJDVFuaxDHXvQ5r%2FkuuzTwyxmg0dZtuL2kr%2F4yJUA0sYaXsmSwwH5RngIx57aUV5P%2BdymC4Z7asDq1Zjg3WL36sdrfKmsswOkq1aFR6MB34j9LlTFWnEfpeaYMX4%3D"}]}'
+      - '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=y70N%2FLD%2BvfCzlSYAzCXg0mewPkHNFUPcbX%2BiTVeXZmrMHZalJITL2un2LSy%2FwRR7Ug%2BEJCq1D%2BfssHs%2FrkGdwMhm2XkxeDCwGIsb1ysTng%3D%3D"}]}'
       Response:
       - '200'
       Server:
@@ -200,7 +198,7 @@ interactions:
       Vary:
       - Accept-Encoding,Origin
       X-Ezoic-Cdn:
-      - Hit d2;ms;e8c091b8fef8fc8ea79029afa4c92798;2-176527-2;sSPHSIJfWFBVkgZpmyirl
+      - Miss
       X-Middleton-Display:
       - staticcontent_sol
       X-Middleton-Response:

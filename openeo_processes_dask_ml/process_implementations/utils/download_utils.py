@@ -85,3 +85,13 @@ def download_s3(url: str, target_path: str):
         raise Exception(
             f"Error connecting to s3 storage to download model"
         )
+
+
+def download(url: str, target_path: str):
+    protocol = url.split("://")[0]
+
+    # download the model
+    if protocol == "http" or protocol == "https":
+        download_http(url, target_path)
+    elif protocol == "s3":
+        download_s3(url, target_path)
