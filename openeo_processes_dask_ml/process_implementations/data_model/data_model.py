@@ -391,12 +391,13 @@ class MLModel(ABC):
         # gdal-calc, openeo, rio-calc, python, docker, uri
 
         # todo: datacube compute new bands?
+        subset_datacube = self.select_bands(datacube)
 
-        scaled_dc = self.scale_values(datacube)
-
-        # todo: datacube value preprocessing
+        scaled_dc = self.scale_values(subset_datacube)
+        preproc_dc = self.preprocess_datacube_expression(scaled_dc)
+        # todo: cast data types?
         # todo: datacube padding?
-        pass
+        return preproc_dc
 
     def postprocess_datacube(self, result_cube) -> xr.DataArray:
         # todo: output gemäß mlm-spec post-processing transformieren
