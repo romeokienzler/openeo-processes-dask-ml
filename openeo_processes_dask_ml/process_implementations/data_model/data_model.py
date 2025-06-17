@@ -133,6 +133,10 @@ class MLModel(ABC):
             if model_dim_name in y_dim_names:
                 return next((y_dim for y_dim in y_dim_names if y_dim in dc_dims), None)
 
+            batch_dim_names = ["batch", "batches"]
+            if model_dim_name in batch_dim_names:
+                return next((batch_dim for batch_dim in batch_dim_names if batch_dim in dc_dims), None)
+
             return None
 
         dim_mapping = []
