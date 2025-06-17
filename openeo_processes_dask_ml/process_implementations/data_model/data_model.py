@@ -246,19 +246,7 @@ class MLModel(ABC):
             return
 
         # possibilities how the "bands" dimension could be called
-        band_dim_options = ["band", "bands", "b", "channel", "channels"]
-        band_dim_name = None
-        for b in band_dim_options:
-            if b not in datacube.dims:
-                continue
-            band_dim_name = b
-
-        if not band_dim_name:
-            raise DimensionMissing(
-                f"The loaded model requires a bands dimension in its input, but none "
-                f"was found. If this is a mistake, please rename the bands dimension "
-                f"to one of the following: {', '.join(band_dim_options)}"
-            )
+        band_dim_name = dim_utils.get_band_dim_name(datacube)
 
         dc_bands = datacube.coords[band_dim_name]
         band_available_in_datacube: list[bool] = []
