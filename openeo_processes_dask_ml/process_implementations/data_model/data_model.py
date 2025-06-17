@@ -366,8 +366,6 @@ class MLModel(ABC):
         # todo: was tun wenn DC extra dimensionen hat? Öfters anwenden entlang der dimension?
         # todo: z.b. model hat x,y; cube hat x,y,t: Anwenden für jeden Zeitschritt
 
-        self.check_datacube_dimensions(datacube)
-
         if self._model_object is None:
             self.create_object()
 
