@@ -341,10 +341,10 @@ class MLModel(ABC):
     def scale_values(self, datacube: xr.DataArray) -> xr.DataArray:
         scaling = self.model_metadata.input[0].value_scaling
 
-        band_dim_name = "bands"  # todo: dynamically get name
-
         if scaling is None:
             return datacube
+
+        band_dim_name = dim_utils.get_band_dim_name(datacube)
 
         if len(scaling) == 1:
             # scale all bands the same
