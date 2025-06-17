@@ -89,6 +89,8 @@ def load_ml_model(uri: str, model_asset: str = None) -> MLModel:
             "The provided STAC Item does not implement STAC:MLM extension correctly."
         )
 
+    # todo: mlm:framework could be in asset
+
     # Check if model runtime is supported (ONNX!, torch? tf?)
     ml_framework = mlm_item.ext.mlm.framework
 
