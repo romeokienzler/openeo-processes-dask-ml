@@ -9,7 +9,7 @@ import xarray as xr
 from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
 
 from openeo_processes_dask_ml.process_implementations.utils import (
-    model_cache_utils, download_utils, scaling_utils, proc_expression_utils
+    model_cache_utils, download_utils, scaling_utils, proc_expression_utils, dim_utils
 )
 
 from openeo_processes_dask.process_implementations.exceptions import (
