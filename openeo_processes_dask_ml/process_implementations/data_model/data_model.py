@@ -338,6 +338,24 @@ class MLModel(ABC):
 
         return post_cube
 
+    def select_bands(self, datacube: xr.DataArray) -> xr.DataArray:
+        model_inp_bands = self.model_metadata.input[0].bands
+        if not model_inp_bands:
+            return datacube
+
+        band_dim_name = dim_utils.get_band_dim_name(datacube)
+        band_coords = datacube.coords[band_dim_name].values.tolist()
+
+        model_band_names = []
+        for b in model_inp_bands:
+            if isinstance(b, str):
+                model_band_names.append(b)
+            else:
+                model_band_names.append(b.name)
+
+        bands_to_select = dim_utils.get_dc_band_names(band_coords, model_band_names)
+        return datacube.sel(**{band_dim_name: bands_to_select})
+
     def scale_values(self, datacube: xr.DataArray) -> xr.DataArray:
         scaling = self.model_metadata.input[0].value_scaling
 
