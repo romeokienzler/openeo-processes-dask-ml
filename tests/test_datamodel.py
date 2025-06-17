@@ -368,3 +368,47 @@ def test_check_datacube_dimensions(
         # negative test: when an exception is raised
         with pytest.raises(exception_raised):
             d.check_datacube_dimensions(dc, True)
+
+
+@pytest.mark.parametrize(
+    "model_bands",
+    (
+        ["B04", "B08"],
+        [mlm.ModelBand({"name": "B04"}), mlm.ModelBand({"name": "B08"})],
+        ["red", "nir"],
+        ["RED", "NIR"]
+    )
+)
+def test_select_bands(mlm_item: pystac.Item, model_bands: list[str|mlm.ModelBand]):
+    dc = xr.DataArray(
+        da.random.random((3, 3)),
+        dims=["x", "bands"],
+        coords={"x": [1, 2, 3], "bands": ["B03", "B04", "B08"]}
+    )
+
+    mlm_item.ext.mlm.input[0].bands = model_bands
+    d = DummyMLModel(mlm_item)
+
+    new_dc = d.select_bands(dc)
+    assert new_dc.coords["bands"].values.tolist() == ["B04", "B08"]
+
+
+def test_reshape_dc_for_input(mlm_item: pystac.Item):
+    model_input_dims = ["batch", "band", "x", "y"]
+    model_input_shape = [-1, 3, 5, 5]
+    mlm_item.ext.mlm.input[0].input.dim_order = model_input_dims
+    mlm_item.ext.mlm.input[0].input.shape = model_input_shape
+
+    d = DummyMLModel(mlm_item)
+
+    dc_dims = ["b", "y", "x"]
+    dc_shp = [3, 15, 15]
+    dc = xr.DataArray(
+        da.random.random(dc_shp),
+        dims=dc_dims
+    )
+
+    new_dc = d.reshape_dc_for_input(dc)
+    print("\n- - - - - - -")
+    print(new_dc)
+    print("- - - - -")
