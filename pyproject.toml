@@ -23,6 +23,10 @@ matplotlib = "^3.10.3"
 onnxruntime-gpu = "^1.22.0"
 onnx = "^1.18.0"
 
+
+[tool.poetry.group.torch.dependencies]
+torch = "^2.7.1"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
