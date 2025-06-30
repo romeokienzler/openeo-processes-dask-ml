@@ -15,6 +15,11 @@ try:
     AVAILABLE_ML_FRAMEWORKS.append("ONNX")
 except ModuleNotFoundError:
     pass
+try:
+    from.data_model import TorchModel
+    AVAILABLE_ML_FRAMEWORKS.append("PyTorch")
+except ModuleNotFoundError:
+    pass
 
 
 def _load_stac_from_remote(uri: str) -> dict[str, Any]:
@@ -103,6 +108,8 @@ def load_ml_model(uri: str, model_asset: str = None) -> MLModel:
 
     if ml_framework == "ONNX":
         model_object = ONNXModel(mlm_item)
+    elif ml_framework == "PyTorch":
+        model_object = TorchModel(mlm_item)
     else:
         raise Exception(
             f"{ml_framework} runtime is not supported."
