@@ -360,6 +360,88 @@ class MLModel(ABC):
         batched_cube = xr.concat(part_cubes, dim="batch")
         return batched_cube
 
+    def get_batch_size(self) -> int:
+        dim_order = self.model_metadata.input[0].input.dim_order
+        shape = self.model_metadata.input[0].input.shape
+        batch_size_recommendation = self.model_metadata.batch_size_suggestion
+        batch_in_dimensions = "batch" in dim_order
+
+        # todo figure out a good fallback
+        fallback_batch_size = 12
+
+        # 1) no batch size anywhere
+        # - NO batch size present in in_dims and no recommendation: 1
+        if batch_size_recommendation is None and not batch_in_dimensions:
+            return 1
+
+        # 2) one batch size available
+        # - no batch size present in in_dim, but recommendation: Is that possible???
+        if not batch_in_dimensions and batch_size_recommendation is not None:
+            return batch_size_recommendation
+
+        # - batch size present in in_dim and not recommendation: size from in_dims
+        if batch_in_dimensions and batch_size_recommendation is None:
+            batch_size = shape[dim_order.index("batch")]
+            if batch_size == -1:
+                return fallback_batch_size
+            else:
+                return batch_size
+
+        # 3) batch size present in in_dim and recommendation:
+        if batch_in_dimensions and batch_size_recommendation is not None:
+            batch_size = shape[dim_order.index("batch")]
+            if batch_size == -1:
+                return batch_size_recommendation
+            if batch_size == batch_size_recommendation:
+                return batch_size_recommendation
+            if batch_size != batch_size_recommendation:
+                return batch_size
+
+        # this point should never be reached
+        raise Exception("Cannot figure out model batch size")
+
+    def feed_datacube_to_model(self, datacube: xr.DataArray, n_batches: int):
+        b_len = len(datacube.coords["batch"])
+
+        for b_idx in range(0, b_len, n_batches):
+            batch_subsets = range(
+                b_idx,
+                # account for "end" of DC where there are fewer batches left
+                b_idx + n_batches if b_idx + n_batches < b_len else b_len
+            )
+
+            s_dc = datacube.isel(batch=batch_subsets)
+            self.execute_model(s_dc)
+
+    def subset_datacube_for_model_input(
+            self, datacube: xr.DataArray
+    ) -> list[xr.DataArray]:
+        # get datacube dimensions which are not in the model
+        dim_names_in_model = [
+            d[0] for d in self.get_datacube_dimension_mapping(datacube) if d is not None
+        ]
+        dims_not_in_model = [d for d in datacube.dims if d not in dim_names_in_model]
+
+        # if a "batch" dimension is not in the model, we will take care of that later
+        if "batch" in dims_not_in_model:
+            dims_not_in_model.remove("batch")
+
+        # create subsets of cubes:
+        # iterate over each dimension that is not used for model input
+
+        coords = [datacube.coords[d].values.tolist() for d in dims_not_in_model]
+        idx_sets = itertools.product(*coords)
+
+        subcubes = []
+        for idx_set in idx_sets:
+            subset = {
+                dim_name: idx for idx, dim_name in zip(idx_set, dims_not_in_model)
+            }
+            subcube = datacube.sel(**subset)
+            subcubes.append(subcube)
+
+        return subcubes
+
     def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
         self.check_datacube_dimensions(datacube)
 
