@@ -320,21 +320,22 @@ class MLModel(ABC):
         dim_mapping = self.get_datacube_dimension_mapping(dc)
 
         # get new dc dim order and shape without "batch" dim
-        dc_new_dim_order = [d[0] for d in dim_mapping if d is not None]
+        dc_dims_in_model = [d[0] for d in dim_mapping if d is not None]
         dc_new_input_shape = [
             dim_len
             for dim_name, dim_len in zip(model_inp_dims, model_inp_shape)
             if dim_name != "batch"
         ]
+        dc_new_dim_order = [*dc_dims_in_model, ...]
 
         # reorder dc dims according to model specification
         reordered_dc = dc.transpose(*dc_new_dim_order)
-        dc_dims = reordered_dc.dims
-        dc_shape = reordered_dc.shape
+        #dc_dims = reordered_dc.dims
+        dc_shape = reordered_dc.shape[0:len(dc_dims_in_model)]
 
         # construct a list of indexes by which the dc will be subsetted lated
         dim_ranges = []
-        for i in range(len(dc_dims)):
+        for i in range(len(dc_dims_in_model)):
             step_size = dc_new_input_shape[i]
             n_steps = dc_shape[i] // dc_new_input_shape[i]
 
@@ -348,7 +349,7 @@ class MLModel(ABC):
         for idx in idx_list:
             idxes = {
                 dim_name: range(idx[i], idx[i]+dc_new_input_shape[i])
-                for i, dim_name in enumerate(dc_dims)
+                for i, dim_name in enumerate(dc_dims_in_model)
             }
             dc_part = reordered_dc.isel(**idxes)
             dc_part = dc_part.expand_dims(
@@ -443,10 +444,8 @@ class MLModel(ABC):
         return subcubes
 
     def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
-        self.check_datacube_dimensions(datacube)
-
-        # todo: was tun wenn DC extra dimensionen hat? Öfters anwenden entlang der dimension?
-        # todo: z.b. model hat x,y; cube hat x,y,t: Anwenden für jeden Zeitschritt
+        # first check if all dims required by model are in data cube
+        self.check_datacube_dimensions(datacube, ignore_batch_dim=True)
 
         if self._model_object is None:
             self.create_object()
@@ -456,14 +455,16 @@ class MLModel(ABC):
         # todo: datacube rechunk?
 
         input_dc = self.reshape_dc_for_input(pre_datacube)
+        input_dc = input_dc.compute()
 
-        # todo: iterate over all other DC dimensions
+        subcubes = self.subset_datacube_for_model_input(input_dc)
 
-        # todo: call execute_model function
-        b = None  # dummy variable for batches, will be properly filled later
-        result = self.execute_model(b)
+        n_batches = self.get_batch_size()
+        for subcube in subcubes:
+            self.feed_datacube_to_model(subcube, n_batches)
 
-        post_cube = self.postprocess_datacube(result)
+        post_cube = xr.DataArray([1,2,3], dims=["d1"])
+        # post_cube = self.postprocess_datacube(result)
 
         return post_cube
 
@@ -541,9 +542,11 @@ class MLModel(ABC):
 
         scaled_dc = self.scale_values(subset_datacube)
         preproc_dc = self.preprocess_datacube_expression(scaled_dc)
-        # todo: cast data types?
+        preproc_dc_casted = preproc_dc.astype(
+            self.model_metadata.input[0].input.data_type
+        )
         # todo: datacube padding?
-        return preproc_dc
+        return preproc_dc_casted
 
     def postprocess_datacube(self, result_cube) -> xr.DataArray:
         # todo: output gemäß mlm-spec post-processing transformieren
