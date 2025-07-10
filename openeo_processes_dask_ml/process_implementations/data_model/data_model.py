@@ -307,7 +307,7 @@ class MLModel(ABC):
         self._check_datacube_dimension_size(datacube, ignore_batch_dim)
         self._check_datacube_bands(datacube)
 
-    def get_index_subsets(self, dc: xr.DataArray) -> list[int]:
+    def get_index_subsets(self, dc: xr.DataArray) -> list[tuple]:
         """
         Get the index per dimension by which the datacube needs to be subset to
         fit the model input
