@@ -532,6 +532,21 @@ class MLModel(ABC):
             )
         return proc_expression_utils
 
+    def postprocess_datacube_expression(self, output_obj):
+        post_proc_expression = self.model_metadata.output[0].post_processing_function
+        if post_proc_expression is None:
+            return output_obj
+
+        try:
+            post_processed_output = proc_expression_utils.run_process_expression(
+                output_obj, post_proc_expression
+            )
+        except ExpressionEvaluationException as e:
+            raise Exception(
+                f"Error applying post-processing function: {str(e)}"
+            )
+        return post_processed_output
+
     def preprocess_datacube(self, datacube: xr.DataArray) -> xr.DataArray:
 
         # processing expression formats
