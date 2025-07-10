@@ -307,10 +307,56 @@ class MLModel(ABC):
         self._check_datacube_dimension_size(datacube, ignore_batch_dim)
         self._check_datacube_bands(datacube)
 
+    def get_index_subsets(self, dc: xr.DataArray) -> list[int]:
+        """
+        Get the index per dimension by which the datacube needs to be subset to
+        fit the model input
+        :param dc: The datacube
+        :return: Indexes per dimension, in the order of dim_order
+        """
+        model_inp_dims = self.model_metadata.input[0].input.dim_order
+        model_inp_shape = self.model_metadata.input[0].input.shape
+        dim_mapping = self.get_datacube_dimension_mapping(dc)
+
+        # get new dc dim order and shape without "batch" dim
+        dc_dims_in_model = [d[0] for d in dim_mapping if d is not None]
+
+        dc_new_input_shape = [
+            dim_len
+            for dim_name, dim_len in zip(model_inp_dims, model_inp_shape)
+            if dim_name != "batch"
+        ]
+
+        dc_shape = dc.shape
+
+        dim_ranges = []
+        for i in range(len(dc_dims_in_model)):
+            step_size = dc_new_input_shape[i]
+            n_steps = dc_shape[i] // dc_new_input_shape[i]
+
+            # end at last full step size, remaining values will be cut off
+            end = n_steps * step_size
+            dim_ranges.append(range(0, end, step_size))
+        idx_list = itertools.product(*dim_ranges)
+        return idx_list
+
+    def reorder_dc_dims_for_model_input(self, dc: xr.DataArray) -> xr.DataArray:
+        """
+        Reorders the datacube dimensions according according to model input dims
+        :param dc: The datacube
+        :return: the reordered datacube
+        """
+        dim_mapping = self.get_datacube_dimension_mapping(dc)
+        dc_dims_in_model = [d[0] for d in dim_mapping if d is not None]
+        dc_new_dim_order = [*dc_dims_in_model, ...]
+        reordered_dc = dc.transpose(*dc_new_dim_order)
+        return reordered_dc
+
     def reshape_dc_for_input(self, dc: xr.DataArray) -> xr.DataArray:
         """
         Reshapes a datacube into batches to fit the model's input specification.
-        Input DC must have only dimensions must be equivalent to what is in the model
+        Input DC must have only dimensions must be equivalent to what is in the model.
+        Dim order of input DC must be the same as in model input.
         :param dc: The datacube to be reshaped
         :return: reshaped DC
         """
@@ -326,35 +372,31 @@ class MLModel(ABC):
             for dim_name, dim_len in zip(model_inp_dims, model_inp_shape)
             if dim_name != "batch"
         ]
-        dc_new_dim_order = [*dc_dims_in_model, ...]
 
-        # reorder dc dims according to model specification
-        reordered_dc = dc.transpose(*dc_new_dim_order)
-        #dc_dims = reordered_dc.dims
-        dc_shape = reordered_dc.shape[0:len(dc_dims_in_model)]
-
-        # construct a list of indexes by which the dc will be subsetted lated
-        dim_ranges = []
-        for i in range(len(dc_dims_in_model)):
-            step_size = dc_new_input_shape[i]
-            n_steps = dc_shape[i] // dc_new_input_shape[i]
-
-            # end at last full step size, remaining values will be cut off
-            end = n_steps * step_size
-            dim_ranges.append(range(0, end, step_size))
-        idx_list = itertools.product(*dim_ranges)
+        idx_list = self.get_index_subsets(dc)
 
         # subset dc by indexes to create partial cubes
         part_cubes = []
         for idx in idx_list:
+
+            # dict of idxes by dim by which the DC will be subset
             idxes = {
                 dim_name: range(idx[i], idx[i]+dc_new_input_shape[i])
                 for i, dim_name in enumerate(dc_dims_in_model)
             }
-            dc_part = reordered_dc.isel(**idxes)
+
+            dc_part = dc.isel(**idxes)
+
+            # drop DC coordinates (they only cause problems later...
+            dc_part = dc_part.drop_vars(
+                [dim_name for dim_name in dc_dims_in_model if dim_name in dc_part.coords]
+            )
+
+            # add batch dimension
             dc_part = dc_part.expand_dims(
                 dim={"batch": 1},
                 axis=model_inp_dims.index("batch") if "batch" in model_inp_dims else 0)
+
             part_cubes.append(dc_part)
 
         # concat partial cubes by batch dimension
@@ -362,12 +404,16 @@ class MLModel(ABC):
         return batched_cube
 
     def get_batch_size(self) -> int:
+        """
+        Compute the actual batch size to use when running the model
+        :return: batch size
+        """
         dim_order = self.model_metadata.input[0].input.dim_order
         shape = self.model_metadata.input[0].input.shape
         batch_size_recommendation = self.model_metadata.batch_size_suggestion
         batch_in_dimensions = "batch" in dim_order
 
-        # todo figure out a good fallback
+        # todo figure out a good fallback, take RAM, VRAM into consideration
         fallback_batch_size = 12
 
         # 1) no batch size anywhere
@@ -401,9 +447,12 @@ class MLModel(ABC):
         # this point should never be reached
         raise Exception("Cannot figure out model batch size")
 
-    def feed_datacube_to_model(self, datacube: xr.DataArray, n_batches: int):
+    def feed_datacube_to_model(
+            self, datacube: xr.DataArray, n_batches: int
+    ) -> xr.DataArray:
         b_len = len(datacube.coords["batch"])
 
+        returned_dcs = []
         for b_idx in range(0, b_len, n_batches):
             batch_subsets = range(
                 b_idx,
@@ -412,11 +461,13 @@ class MLModel(ABC):
             )
 
             s_dc = datacube.isel(batch=batch_subsets)
-            self.execute_model(s_dc)
+            model_out = self.execute_model(s_dc)
+            returned_dcs.append(model_out)
+        return xr.concat(returned_dcs, dim="batch")
 
-    def subset_datacube_for_model_input(
+    def get_datacube_subset_indices(
             self, datacube: xr.DataArray
-    ) -> list[xr.DataArray]:
+    ) -> list[dict]:
         # get datacube dimensions which are not in the model
         dim_names_in_model = [
             d[0] for d in self.get_datacube_dimension_mapping(datacube) if d is not None
@@ -433,15 +484,17 @@ class MLModel(ABC):
         coords = [datacube.coords[d].values.tolist() for d in dims_not_in_model]
         idx_sets = itertools.product(*coords)
 
-        subcubes = []
+        # todo: handle cases where all dims are model inputs (= no subcube_idx_sets)
+
+        subcube_idx_sets = []
         for idx_set in idx_sets:
             subset = {
                 dim_name: idx for idx, dim_name in zip(idx_set, dims_not_in_model)
             }
-            subcube = datacube.sel(**subset)
-            subcubes.append(subcube)
+            subcube_idx_sets.append(subset)
+            # subcube = datacube.sel(**subset)
 
-        return subcubes
+        return subcube_idx_sets
 
     def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
         # first check if all dims required by model are in data cube
@@ -453,19 +506,36 @@ class MLModel(ABC):
         pre_datacube = self.preprocess_datacube(datacube)
 
         # todo: datacube rechunk?
-
-        input_dc = self.reshape_dc_for_input(pre_datacube)
+        reordered_dc = self.reorder_dc_dims_for_model_input(pre_datacube)
+        input_dc = self.reshape_dc_for_input(reordered_dc)
         input_dc = input_dc.compute()
 
-        subcubes = self.subset_datacube_for_model_input(input_dc)
+        # get list of datacube subset coordinates
+        # these are dimensions with coordinates that are not used in model input
+        subcube_idx_sets = self.get_datacube_subset_indices(input_dc)
 
         n_batches = self.get_batch_size()
-        for subcube in subcubes:
-            self.feed_datacube_to_model(subcube, n_batches)
+        inferred_batches = []
 
-        post_cube = xr.DataArray([1,2,3], dims=["d1"])
-        # post_cube = self.postprocess_datacube(result)
+        # iterate over coordinates of unused dimensions
+        # perform inference for each individually
+        # todo: handle cases where all dims are model inputs (= no subcube_idx_sets)
+        for subcube_idx_set in subcube_idx_sets:
+            # slice datacube by unused dimension coordinates
+            subcube = input_dc.sel(**subcube_idx_set)
 
+            # run inference on datacube subsets
+            model_out = self.feed_datacube_to_model(subcube, n_batches)
+            inferred_batches.append(model_out)
+
+        post_cube = xr.concat(inferred_batches, dim="batch")
+        # todo reassemble data cube from batches
+        # -resolve batches per subcube
+        # -resolve subcubes
+
+        # could or could not have x/y lan/lon dimensions
+        # attach missing dimensions
+        # attach appropriate coordinates to dimensions
         return post_cube
 
     def select_bands(self, datacube: xr.DataArray) -> xr.DataArray:
@@ -520,6 +590,7 @@ class MLModel(ABC):
         return xr.concat(scaled_bands, dim=band_dim_name)
 
     def preprocess_datacube_expression(self, datacube: xr.DataArray):
+        # todo: is xarray datacube really input/output?
         pre_proc_expression = self.model_metadata.input[0].pre_processing_function
         if pre_proc_expression is None:
             return datacube
@@ -530,6 +601,7 @@ class MLModel(ABC):
             raise Exception(
                 f"Error applying pre-processing function to datacube: {str(e)}"
             )
+        # todo: is this return correct???
         return proc_expression_utils
 
     def postprocess_datacube_expression(self, output_obj):
@@ -581,5 +653,5 @@ class MLModel(ABC):
         pass
 
     @abstractmethod
-    def execute_model(self, batch):
+    def execute_model(self, batch: xr.DataArray) -> xr.DataArray:
         pass
