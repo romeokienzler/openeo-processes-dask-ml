@@ -1,11 +1,16 @@
 import os.path
 import itertools
+from typing import Any
+
+import numpy.dtypes
+import xarray.core.coordinates
 
 import pystac
 from pystac.extensions.mlm import MLMExtension
 from abc import ABC, abstractmethod
 
 import xarray as xr
+import numpy as np
 
 from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
 
@@ -496,12 +501,160 @@ class MLModel(ABC):
 
         return subcube_idx_sets
 
+    def resolve_batch(
+            self,
+            dc_batched: xr.DataArray,
+            batch_indices: tuple[tuple[int, ...], ...],
+            subcube_slice: dict[str, Any],
+            input_dc_dim_mapping: list[None|tuple[str, int]],
+            input_dc_coords: xarray.core.coordinates.DataArrayCoordinates
+    ) -> xr.DataArray:
+        """
+        Resolves the datacube batches that come out of the ML model back to a spatio-
+        temporal datacube
+        :param dc_batched: the batched datacube
+        :param batch_indices: The indices used to to create the batches
+        :param subcube_slice: The indices used to slice the datacube
+        :param input_dc_dim_mapping:
+        :param input_dc_coords: Input datacube coordinates
+        :return: the un-batched datacube
+        """
+        # assert DC has a "batch" dimension
+        if "batch" not in dc_batched.dims:
+            raise Exception("Datacube does not have a batch dimension")
+
+        # assert each batch dimension has appropriate coordinate indices
+        if len(dc_batched.coords["batch"]) != len(batch_indices):
+            raise Exception(
+                "Different number of batches in datacube that given in batch_indices"
+            )
+
+        # set name to None to ensure that combine_by_coords will return a DataArray
+        dc_batched.name = None
+
+        model_input_shape = self.model_metadata.input[0].input.shape
+
+        # get names of datacube input dimensions
+        dc_input_dims = [
+            n[0] if n is not None else None for n in input_dc_dim_mapping
+        ]
+        # filter out "batch" dimension (is None in mapping)
+        dc_input_dims_without_batch = [
+            n for n in dc_input_dims if n is not None
+        ]
+
+        model_output_dims = self.model_metadata.output[0].result.dim_order
+        model_output_shape = self.model_metadata.output[0].result.shape
+
+        reshaped_slices = []
+
+        for batch_idx, batch_coord_idxes in zip(dc_batched.coords["batch"], batch_indices):
+            # slice datacube by batch index
+            dc_slice = dc_batched.sel(batch=batch_idx)
+
+            # dict with dims to be added. Key is dim name, value is coordinate
+            dims_to_add = {}
+
+            for inp_dim_name, inp_idx in zip(dc_input_dims_without_batch, batch_coord_idxes):
+
+                # case: inp_dim_name not in output cube
+                if inp_dim_name not in model_output_dims:
+
+                    # special case: band dimension
+                    if inp_dim_name in ["band", "bands", "channel", "channels"]:
+                        continue
+
+                    dims_to_add[inp_dim_name] = [inp_idx]
+
+                # inp_dim_name in output cube
+                else:
+
+                    # get new dim length
+                    new_dim_len = model_output_shape[model_output_dims.index(inp_dim_name)]
+                    old_dim_len = model_input_shape[dc_input_dims.index(inp_dim_name)]
+
+                    # get input dc coords for dim
+                    coords_for_dim = input_dc_coords[inp_dim_name].data
+
+                    if inp_dim_name not in input_dc_coords:
+                        # special case: DC does not have coords for a dimension
+                        new_coords = np.array(range(new_dim_len))
+
+                    elif old_dim_len == new_dim_len:
+                        # special case: length is the same in input and output
+                        # -> simply assign the same coords
+                        new_coords = coords_for_dim[inp_idx:inp_idx+old_dim_len]
+
+                    elif np.issubdtype(coords_for_dim.dtype, np.number):
+                        # for numeric coords, space them evenly between min and max
+                        coord_start = coords_for_dim[inp_idx]
+                        try:
+                            coord_end = coords_for_dim[inp_idx+old_dim_len]
+                        except IndexError:
+                            diff = coords_for_dim[1] - coords_for_dim[0]
+                            coord_end = coords_for_dim[-1] + diff
+                        new_coords = np.linspace(coord_start, coord_end, new_dim_len, endpoint=False)
+
+                    elif np.issubdtype(coords_for_dim.dtype, np.datetime64):
+                        # for datetime coords, space them evenly between start and end
+                        # This solution is not ideal as time coords are usually not
+                        # spaced evenly in input DC
+                        coords_start = coords_for_dim[inp_idx].astype("datetime64[s]").astype(int)
+                        try:
+                            coord_end = coords_for_dim[inp_idx+old_dim_len].astype("datetime64[s]").astype(int)
+                        except IndexError:
+                            mean_diff = np.mean(coords_for_dim[1:] - coords_for_dim[:-1])
+                            end_date = coords_for_dim[-1] + mean_diff
+                            coord_end = end_date.astype("datetime64[s]").astype(int)
+                        new_coords = np.linspace(coords_start, coord_end, new_dim_len, endpoint=False, dtype=int).astype("datetime64[s]")
+
+                    else:
+                        # all other cases, e.g. str: join input coords,append a number
+                        # ex: B1, B2 -> B1.B2-1, B1.B2-2, B1.B2-3
+                        old_coords = coords_for_dim[inp_idx:inp_idx+old_dim_len]
+                        new_coords = np.char.add(
+                            ".".join(old_coords) + "-",
+                            np.array(range(new_dim_len)).astype(str)
+                        )
+
+                    dc_slice.coords[inp_dim_name] = new_coords
+
+            if dims_to_add:
+                dc_slice = dc_slice.expand_dims(**dims_to_add)
+
+            reshaped_slices.append(dc_slice)
+
+        # omit if dc_dim_len = input_dim_len (12 bands = 12 bands)
+
+        # re-combine the previously batched datacube parts
+        combined_slices = xr.combine_by_coords(reshaped_slices, data_vars="all")
+
+        # embed into higher-level dimensions that were not part of the model input
+        if subcube_slice:
+            combined_slices = combined_slices.expand_dims(
+                **{dim: [subcube_slice[dim]] for dim in subcube_slice}
+            )
+
+        return combined_slices
+
+    def reassemble_datacube(self, dc_parts: list[xr.DataArray]) -> xr.DataArray:
+        """
+        Reassemble the datacube by merging all subcubes back together. Batches must have
+        been converted back to a datacube. Subcubes must contain the same dimensions
+        with same or different coordinates.
+        :param dc_parts:
+        :return:
+        """
+        return xr.combine_by_coords(dc_parts)
+
     def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
         # first check if all dims required by model are in data cube
         self.check_datacube_dimensions(datacube, ignore_batch_dim=True)
 
         if self._model_object is None:
             self.create_object()
+
+        input_dim_mapping = self.get_datacube_dimension_mapping(datacube)
 
         pre_datacube = self.preprocess_datacube(datacube)
 
@@ -514,8 +667,11 @@ class MLModel(ABC):
         # these are dimensions with coordinates that are not used in model input
         subcube_idx_sets = self.get_datacube_subset_indices(input_dc)
 
-        n_batches = self.get_batch_size()
-        inferred_batches = []
+        n_batches = self.get_batch_size()  # batch size to be used during inference
+        resolved_batches = []
+
+        # get dimension indices of each batch: tuple[tuple[int, ], ...]
+        batch_indices = tuple(self.get_index_subsets(reordered_dc))
 
         # iterate over coordinates of unused dimensions
         # perform inference for each individually
@@ -526,16 +682,17 @@ class MLModel(ABC):
 
             # run inference on datacube subsets
             model_out = self.feed_datacube_to_model(subcube, n_batches)
-            inferred_batches.append(model_out)
 
-        post_cube = xr.concat(inferred_batches, dim="batch")
-        # todo reassemble data cube from batches
-        # -resolve batches per subcube
-        # -resolve subcubes
+            # reassemble subcube from batches
+            resolved_batch = self.resolve_batch(
+                model_out, batch_indices, subcube_idx_set, input_dim_mapping, input_dc.coords
+            )
 
-        # could or could not have x/y lan/lon dimensions
-        # attach missing dimensions
-        # attach appropriate coordinates to dimensions
+            resolved_batches.append(resolved_batch)
+
+        # reassemble datacube from subcube
+        post_cube = self.reassemble_datacube(resolved_batches)
+
         return post_cube
 
     def select_bands(self, datacube: xr.DataArray) -> xr.DataArray:
