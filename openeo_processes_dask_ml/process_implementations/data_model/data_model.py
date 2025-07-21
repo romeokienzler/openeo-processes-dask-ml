@@ -637,16 +637,6 @@ class MLModel(ABC):
 
         return combined_slices
 
-    def reassemble_datacube(self, dc_parts: list[xr.DataArray]) -> xr.DataArray:
-        """
-        Reassemble the datacube by merging all subcubes back together. Batches must have
-        been converted back to a datacube. Subcubes must contain the same dimensions
-        with same or different coordinates.
-        :param dc_parts:
-        :return:
-        """
-        return xr.combine_by_coords(dc_parts)
-
     def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
         # first check if all dims required by model are in data cube
         self.check_datacube_dimensions(datacube, ignore_batch_dim=True)
@@ -675,7 +665,6 @@ class MLModel(ABC):
 
         # iterate over coordinates of unused dimensions
         # perform inference for each individually
-        # todo: handle cases where all dims are model inputs (= no subcube_idx_sets)
         for subcube_idx_set in subcube_idx_sets:
             # slice datacube by unused dimension coordinates
             subcube = input_dc.sel(**subcube_idx_set)
@@ -691,7 +680,7 @@ class MLModel(ABC):
             resolved_batches.append(resolved_batch)
 
         # reassemble datacube from subcube
-        post_cube = self.reassemble_datacube(resolved_batches)
+        post_cube = xr.combine_by_coords(resolved_batches)
 
         return post_cube
 
