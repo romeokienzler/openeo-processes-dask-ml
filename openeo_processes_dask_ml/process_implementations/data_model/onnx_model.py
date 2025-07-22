@@ -1,12 +1,11 @@
-from .data_model import MLModel
-
 import onnx
 import onnxruntime as ort
+
+from .data_model import MLModel
 
 
 class ONNXModel(MLModel):
     def create_model_object(self, model_filepath: str):
-
         onnx_model = onnx.load(model_filepath)
 
         try:

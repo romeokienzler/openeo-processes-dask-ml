@@ -1,9 +1,10 @@
 import xarray as xr
-
 from openeo_processes_dask.process_implementations.exceptions import DimensionMissing
+
 from openeo_processes_dask_ml.process_implementations.exceptions import (
-    BandNotFoundException
+    BandNotFoundException,
 )
+
 _band_dim_options = ["band", "bands", "b", "channel", "channels"]
 
 
@@ -55,13 +56,11 @@ def get_band_alternative_names(band_name: str) -> list[str]:
         ["aot"],
         ["scl"],
         ["snw"],
-
-        #sentinel 1 bands
+        # sentinel 1 bands
         ["hh"],
         ["hv"],
         ["vh"],
         ["vv"],
-
     ]
 
     for band_name_group in band_name_groups:
@@ -98,4 +97,3 @@ def get_dc_band_names(dc_band_names: list[str], band_names: list[str]) -> list[s
                 break
 
     return bands_in_dc
-

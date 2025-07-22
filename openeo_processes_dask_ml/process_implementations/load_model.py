@@ -1,22 +1,27 @@
 import json
-from typing import Any
 import os
 import re
+from typing import Any
+
 import requests
 import requests.exceptions
-import pystac
 from stac_validator.validate import StacValidate
+
+import pystac
 
 AVAILABLE_ML_FRAMEWORKS: list[str] = []
 
 from .data_model import MLModel
+
 try:
     from .data_model import ONNXModel
+
     AVAILABLE_ML_FRAMEWORKS.append("ONNX")
 except ModuleNotFoundError:
     pass
 try:
-    from.data_model import TorchModel
+    from .data_model import TorchModel
+
     AVAILABLE_ML_FRAMEWORKS.append("PyTorch")
 except ModuleNotFoundError:
     pass
@@ -41,11 +46,9 @@ def _load_stac_from_remote(uri: str) -> dict[str, Any]:
 
 def _load_stac_from_local(uri: str) -> dict[str, Any]:
     if not os.path.exists(uri):
-        raise Exception(
-            f"Could not locate file for the URI provided: {uri}"
-        )
+        raise Exception(f"Could not locate file for the URI provided: {uri}")
 
-    with open(uri, "r") as file:
+    with open(uri) as file:
         try:
             stac = json.load(file)
         except json.decoder.JSONDecodeError:
@@ -78,11 +81,15 @@ def load_ml_model(uri: str, model_asset: str = None) -> MLModel:
 
     # Check if downloaded STAC Item implements the STAC:MLM extension
     extensions = stac["stac_extensions"]
-    regex = r'^https:\/\/stac-extensions\.github\.io\/mlm\/v(\d+\.){0,2}\d*\/schema\.json$'
+    regex = (
+        r"^https:\/\/stac-extensions\.github\.io\/mlm\/v(\d+\.){0,2}\d*\/schema\.json$"
+    )
     pattern = re.compile(regex)
     follows_mlm = any(pattern.match(s) for s in extensions)
     if not follows_mlm:
-        raise Exception("The provided STAC Item does not implement the STAC:MLM standard")
+        raise Exception(
+            "The provided STAC Item does not implement the STAC:MLM standard"
+        )
 
     mlm_item = pystac.Item.from_dict(stac)
 
@@ -111,9 +118,7 @@ def load_ml_model(uri: str, model_asset: str = None) -> MLModel:
     elif ml_framework == "PyTorch":
         model_object = TorchModel(mlm_item)
     else:
-        raise Exception(
-            f"{ml_framework} runtime is not supported."
-        )
+        raise Exception(f"{ml_framework} runtime is not supported.")
 
     # download model
     # question: Download here, or when mdoel is actually executed?

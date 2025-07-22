@@ -1,12 +1,13 @@
-import requests
 import boto3
 import botocore.exceptions
+import requests
 from botocore import UNSIGNED
 from botocore.config import Config
 
 from openeo_processes_dask_ml.process_implementations.constants import (
-    S3_MODEL_REPO_ENDPOINT, S3_MODEL_REPO_ACCESS_KEY_ID,
-    S3_MODEL_REPO_SECRET_ACCESS_KEY
+    S3_MODEL_REPO_ACCESS_KEY_ID,
+    S3_MODEL_REPO_ENDPOINT,
+    S3_MODEL_REPO_SECRET_ACCESS_KEY,
 )
 
 
@@ -63,28 +64,24 @@ def download_s3(url: str, target_path: str):
     try:
         if S3_MODEL_REPO_ACCESS_KEY_ID and S3_MODEL_REPO_SECRET_ACCESS_KEY:
             s3 = boto3.client(
-                's3',
+                "s3",
                 aws_access_key_id=S3_MODEL_REPO_ACCESS_KEY_ID,
                 aws_secret_access_key=S3_MODEL_REPO_SECRET_ACCESS_KEY,
-                endpoint_url=S3_MODEL_REPO_ENDPOINT
+                endpoint_url=S3_MODEL_REPO_ENDPOINT,
             )
         else:
             s3 = boto3.client(
-                's3',
+                "s3",
                 endpoint_url=S3_MODEL_REPO_ENDPOINT,
-                config=Config(signature_version=UNSIGNED)
+                config=Config(signature_version=UNSIGNED),
             )
         s3.download_file(bucket_name, object_key, target_path)
 
     except FileNotFoundError:
-        raise Exception(
-            f"Could not locate file with {object_key=} in {bucket_name=}"
-        )
+        raise Exception(f"Could not locate file with {object_key=} in {bucket_name=}")
 
     except botocore.exceptions.ClientError:
-        raise Exception(
-            f"Error connecting to s3 storage to download model"
-        )
+        raise Exception(f"Error connecting to s3 storage to download model")
 
 
 def download(url: str, target_path: str):

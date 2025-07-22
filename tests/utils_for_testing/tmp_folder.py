@@ -1,7 +1,9 @@
 import os
 
 
-def prepare_tmp_folder(dir_path: str = "./tmp", file_name: str = "file.bin") -> tuple[str, str]:
+def prepare_tmp_folder(
+    dir_path: str = "./tmp", file_name: str = "file.bin"
+) -> tuple[str, str]:
     file_path = dir_path + "/" + file_name
     if not os.path.exists(dir_path):
         os.mkdir(dir_path)

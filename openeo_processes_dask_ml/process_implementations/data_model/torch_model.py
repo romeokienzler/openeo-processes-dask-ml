@@ -1,7 +1,7 @@
-from .data_model import MLModel
-
 import torch
 import xarray as xr
+
+from .data_model import MLModel
 
 
 class TorchModel(MLModel):
@@ -22,8 +22,5 @@ class TorchModel(MLModel):
         # add an artificial batch dimension
 
         out_dims = self.model_metadata.output[0].result.dim_order
-        out_cube = xr.DataArray(
-            out_postproc.numpy(),
-            dims=out_dims
-        )
+        out_cube = xr.DataArray(out_postproc.numpy(), dims=out_dims)
         return out_cube

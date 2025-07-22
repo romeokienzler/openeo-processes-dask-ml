@@ -3,24 +3,22 @@ import unittest.mock
 from datetime import datetime
 from typing import Type
 
-import pytest
-import pystac
-from pystac.extensions import mlm
-
-import numpy as np
-import xarray as xr
 import dask.array as da
-
-from tests.dummy.dummy_ml_model import DummyMLModel
-
+import numpy as np
+import pytest
+import xarray as xr
 from openeo_processes_dask.process_implementations.exceptions import (
-    DimensionMissing, DimensionMismatch
-)
-from openeo_processes_dask_ml.process_implementations.exceptions import (
-    LabelDoesNotExist
+    DimensionMismatch,
+    DimensionMissing,
 )
 
-from tests.utils_for_testing.tmp_folder import prepare_tmp_folder, clear_tmp_folder
+import pystac
+from openeo_processes_dask_ml.process_implementations.exceptions import (
+    LabelDoesNotExist,
+)
+from pystac.extensions import mlm
+from tests.dummy.dummy_ml_model import DummyMLModel
+from tests.utils_for_testing.tmp_folder import clear_tmp_folder, prepare_tmp_folder
 
 
 @pytest.fixture
@@ -28,41 +26,31 @@ def blank_stac_item() -> pystac.Item:
     geom = {
         "type": "Polygon",
         "coordinates": [
-          [
-            [5.8663153, 47.2701114],
-            [5.8663153, 55.099161],
-            [15.0419319, 55.099161],
-            [15.0419319, 47.2701114],
-            [5.8663153, 47.2701114]
-          ]
-        ]
-      }
+            [
+                [5.8663153, 47.2701114],
+                [5.8663153, 55.099161],
+                [15.0419319, 55.099161],
+                [15.0419319, 47.2701114],
+                [5.8663153, 47.2701114],
+            ]
+        ],
+    }
     return pystac.Item("asdf", geom, None, datetime.now(), {})
 
 
 @pytest.fixture
 def random_asset() -> pystac.Asset:
-    return pystac.Asset(
-        "https://example.com",
-        "asdf",
-        "asdf",
-        "asdf",
-        []
-    )
+    return pystac.Asset("https://example.com", "asdf", "asdf", "asdf", [])
+
 
 @pytest.fixture
 def mlm_model_asset(random_asset: pystac.Asset) -> pystac.Asset:
-    return pystac.Asset(
-        "https://example.com",
-        "model",
-        "foo",
-        "asdf",
-        ["mlm:model"]
-    )
+    return pystac.Asset("https://example.com", "model", "foo", "asdf", ["mlm:model"])
+
 
 @pytest.fixture
 def mlm_item(
-        blank_stac_item: pystac.Item, mlm_model_asset: pystac.Asset
+    blank_stac_item: pystac.Item, mlm_model_asset: pystac.Asset
 ) -> pystac.Item:
     blank_stac_item.stac_extensions.append(
         "https://stac-extensions.github.io/mlm/v1.4.0/schema.json"
@@ -77,8 +65,8 @@ def mlm_item(
         "input": {
             "shape": [-1, 4, 224, 224],
             "dim_order": ["batch", "channel", "width", "height"],
-            "data_type": "float64"
-        }
+            "data_type": "float64",
+        },
     }
     outp = {
         "name": "classification",
@@ -86,8 +74,8 @@ def mlm_item(
         "result": {
             "shape": [-1, 1, 1, 1],
             "dim_order": ["batch", "channel", "width", "height"],
-            "data_type": "uint8"
-        }
+            "data_type": "uint8",
+        },
     }
 
     blank_stac_item.properties["mlm:input"] = [inp]
@@ -99,7 +87,9 @@ def mlm_item(
     return blank_stac_item
 
 
-def test_correct_asset_selection(blank_stac_item, random_asset, mlm_model_asset) -> None:
+def test_correct_asset_selection(
+    blank_stac_item, random_asset, mlm_model_asset
+) -> None:
     d = DummyMLModel(blank_stac_item)
     with pytest.raises(Exception):
         d._get_model_asset()
@@ -153,28 +143,24 @@ def test_get_model(mlm_item: pystac.Item, monkeypatch):
         (("band", "x", "y", "time"), ("band", "lon", "lat", "t"), (0, 1, 2, 3)),
         (("t", "x", "y", "channel"), ("band", "x", "y", "time"), (3, 1, 2, 0)),
         (("x", "y", "asdf"), ("x", "y", "bands", "t"), (0, 1, None)),
-    )
+    ),
 )
 def test_get_datacube_dimension_mapping(
-        mlm_item: pystac.Item,
-        model_dim_names: tuple[str],
-        dc_dim_names: tuple[str],
-        idx: list[int|None]
+    mlm_item: pystac.Item,
+    model_dim_names: tuple[str],
+    dc_dim_names: tuple[str],
+    idx: list[int | None],
 ):
     d = DummyMLModel(mlm_item)
     mlm_item.ext.mlm.input[0].input.dim_order = model_dim_names
 
-    cube = xr.DataArray(
-        da.random.random((1,1,1,1)),
-        dims=dc_dim_names
-    )
+    cube = xr.DataArray(da.random.random((1, 1, 1, 1)), dims=dc_dim_names)
 
     mapping = d.get_datacube_dimension_mapping(cube)
     assert len(idx) == len(mapping)
     assert len(model_dim_names) == len(mapping)
 
     for i, model_dim_name in enumerate(model_dim_names):
-
         if mapping[i] is not None:
             mapped_dim_name = mapping[i][0]
             map_idx = mapping[i][1]
@@ -188,19 +174,13 @@ def test_get_datacube_dimension_mapping(
         (["asdf", "channel", "width", "height"], False, False),
         (["batch", "channel", "width", "asdf"], True, False),
         (["batch", "channel", "width", "asdf"], False, False),
-    )
+    ),
 )
 def test_check_dimensions_present_in_datacube(
-    mlm_item: pystac.Item,
-    dc_dims: list[str],
-    ignore_batch: bool,
-    valid: bool
+    mlm_item: pystac.Item, dc_dims: list[str], ignore_batch: bool, valid: bool
 ):
     d = DummyMLModel(mlm_item)
-    dc = xr.DataArray(
-        da.random.random((1,1,1,1)),
-        dims=dc_dims
-    )
+    dc = xr.DataArray(da.random.random((1, 1, 1, 1)), dims=dc_dims)
 
     if valid:
         d._check_dimensions_present_in_datacube(dc, ignore_batch)
@@ -219,21 +199,15 @@ def test_check_dimensions_present_in_datacube(
         ([10, 10, 230, 230], True, True),
         ([10, 2, 230, 230], True, False),
         ([10, 10, 15, 230], False, False),
-    )
+    ),
 )
 def test_check_datacube_dimension_size(
-    mlm_item: pystac.Item,
-    dc_shape: list[int],
-    ignore_batch: bool,
-    valid: bool
+    mlm_item: pystac.Item, dc_shape: list[int], ignore_batch: bool, valid: bool
 ):
     d = DummyMLModel(mlm_item)
     dc_dims = ["batch", "channel", "width", "height"]
 
-    dc = xr.DataArray(
-        da.random.random(dc_shape),
-        dims=dc_dims
-    )
+    dc = xr.DataArray(da.random.random(dc_shape), dims=dc_dims)
     if valid:
         d._check_datacube_dimension_size(dc, ignore_batch)
     else:
@@ -253,65 +227,70 @@ def test_check_datacube_dimension_size(
             [mlm.ModelBand({"name": "B02"}), mlm.ModelBand({"name": "B03"})],
             ["B02", "B03"],
             "band",
-            None
+            None,
         ),
         (
             [mlm.ModelBand({"name": "B02"}), mlm.ModelBand({"name": "B03"})],
             ["B02", "B03", "B04"],
             "band",
-            None
+            None,
         ),
         (
             [mlm.ModelBand({"name": "B02"}), mlm.ModelBand({"name": "B03"})],
             ["B02", "B04"],
             "band",
-            LabelDoesNotExist
+            LabelDoesNotExist,
         ),
         (
             [
                 mlm.ModelBand({"name": "NDVI", "format": "asdf"}),
-                mlm.ModelBand({"name": "B02"})
+                mlm.ModelBand({"name": "B02"}),
             ],
             ["B02", "B04"],
             "band",
-            ValueError
+            ValueError,
         ),
         (
             [
                 mlm.ModelBand({"name": "NDVI", "expression": "asdf"}),
-                mlm.ModelBand({"name": "B02"})
+                mlm.ModelBand({"name": "B02"}),
             ],
             ["B02", "B04"],
             "band",
-            ValueError
+            ValueError,
         ),
         (
             [
                 mlm.ModelBand({"name": "B04"}),
                 mlm.ModelBand({"name": "B08"}),
-                mlm.ModelBand({
-                    "name": "NDVI",
-                    "format": "python",
-                    "expression": "(B08-B04)/(B08+B04)"}
-                )
+                mlm.ModelBand(
+                    {
+                        "name": "NDVI",
+                        "format": "python",
+                        "expression": "(B08-B04)/(B08+B04)",
+                    }
+                ),
             ],
             ["B04", "B08"],
             "band",
-            None
+            None,
         ),
-    )
+    ),
 )
 def test_check_datacube_bands(
-        mlm_item: pystac.Item, m_bands: list[str|mlm.ModelBand], dc_bands: list[str],
-        dc_band_dim_name: str, exception: Type[Exception]|None
+    mlm_item: pystac.Item,
+    m_bands: list[str | mlm.ModelBand],
+    dc_bands: list[str],
+    dc_band_dim_name: str,
+    exception: type[Exception] | None,
 ):
     mlm_item.ext.mlm.input[0].bands = m_bands
     d = DummyMLModel(mlm_item)
 
     dc = xr.DataArray(
-        da.random.random((1,1,len(dc_bands))),
+        da.random.random((1, 1, len(dc_bands))),
         dims=["x", "y", dc_band_dim_name],
-        coords={"x": [1], "y": [1], dc_band_dim_name: dc_bands}
+        coords={"x": [1], "y": [1], dc_band_dim_name: dc_bands},
     )
 
     if exception is None:
@@ -328,19 +307,16 @@ def test_check_datacube_bands(
         (("x", "y", "t", "bands"), (1000, 1000, 4, 8), None),
         (("times", "x", "y", "channel"), (4, 1000, 1000, 8), None),
         (("time", "x", "y"), (4, 1000, 1000), DimensionMissing),
-        (("time", "x", "y", "bands"), (4, 100, 100, 8), DimensionMismatch)
-    )
+        (("time", "x", "y", "bands"), (4, 100, 100, 8), DimensionMismatch),
+    ),
 )
 def test_check_datacube_dimensions(
-        mlm_item: pystac.Item,
-        dc_dims: list[str],
-        dc_dim_shp: list[int],
-        exception_raised: Type[Exception]
+    mlm_item: pystac.Item,
+    dc_dims: list[str],
+    dc_dim_shp: list[int],
+    exception_raised: type[Exception],
 ):
-    dc = xr.DataArray(
-        da.random.random(dc_dim_shp),
-        dims=dc_dims
-    )
+    dc = xr.DataArray(da.random.random(dc_dim_shp), dims=dc_dims)
 
     assert len(dc_dim_shp) == len(dc_dim_shp)
 
@@ -364,14 +340,14 @@ def test_check_datacube_dimensions(
         ["B04", "B08"],
         [mlm.ModelBand({"name": "B04"}), mlm.ModelBand({"name": "B08"})],
         ["red", "nir"],
-        ["RED", "NIR"]
-    )
+        ["RED", "NIR"],
+    ),
 )
-def test_select_bands(mlm_item: pystac.Item, model_bands: list[str|mlm.ModelBand]):
+def test_select_bands(mlm_item: pystac.Item, model_bands: list[str | mlm.ModelBand]):
     dc = xr.DataArray(
         da.random.random((3, 3)),
         dims=["x", "bands"],
-        coords={"x": [1, 2, 3], "bands": ["B03", "B04", "B08"]}
+        coords={"x": [1, 2, 3], "bands": ["B03", "B04", "B08"]},
     )
 
     mlm_item.ext.mlm.input[0].bands = model_bands
@@ -391,10 +367,7 @@ def test_reshape_dc_for_input(mlm_item: pystac.Item):
 
     dc_dims = ["b", "y", "x"]
     dc_shp = [3, 15, 15]
-    dc = xr.DataArray(
-        da.random.random(dc_shp),
-        dims=dc_dims
-    )
+    dc = xr.DataArray(da.random.random(dc_shp), dims=dc_dims)
 
     new_dc = d.reshape_dc_for_input(dc)
     print("\n- - - - - - -")
@@ -408,13 +381,9 @@ def test_run_model():
 
 def test_resolve_batches_different_in_out_dims(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
-        da.random.random((1, 4, 1, 1)),
-        dims=["time", "band", "width", "height"]
+        da.random.random((1, 4, 1, 1)), dims=["time", "band", "width", "height"]
     )
-    out_dc = xr.DataArray(
-        da.random.random((4, 20)),
-        dims=["batch", "embedding"]
-    )
+    out_dc = xr.DataArray(da.random.random((4, 20)), dims=["batch", "embedding"])
 
     out_shape = [-1, 20]
     out_dims = ["batch", "embedding"]
@@ -423,9 +392,7 @@ def test_resolve_batches_different_in_out_dims(mlm_item: pystac.Item):
     mlm_item.ext.mlm.output[0].result.dim_order = out_dims
     d = DummyMLModel(mlm_item)
 
-    idx_dict = (
-        (0, 0, 0), (0, 0, 10), (0, 10, 0), (0, 10, 10)
-    )
+    idx_dict = ((0, 0, 0), (0, 0, 10), (0, 10, 0), (0, 10, 10))
     sub_slice = {"time": "a"}
 
     dim_mapping = d.get_datacube_dimension_mapping(in_dc)
@@ -461,13 +428,12 @@ def test_resolve_batches_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item
         dims=["time", "band", "width", "height"],
         coords={
             "band": ["B1", "B2", "B3", "B4"],
-            "width": range(100, 100+448),
-            "height": range(100, 100+448)
-        }
+            "width": range(100, 100 + 448),
+            "height": range(100, 100 + 448),
+        },
     )
     out_dc = xr.DataArray(
-        da.random.random((4, 4, 20, 20)),
-        dims=["batch", "band", "width", "height"]
+        da.random.random((4, 4, 20, 20)), dims=["batch", "band", "width", "height"]
     )
 
     out_shape = [-1, 4, 20, 20]
@@ -477,9 +443,7 @@ def test_resolve_batches_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item
     mlm_item.ext.mlm.output[0].result.dim_order = out_dims
     d = DummyMLModel(mlm_item)
 
-    idx_dict = (
-        (0, 0, 0), (0, 0, 224), (0, 224, 0), (0, 224, 224)
-    )
+    idx_dict = ((0, 0, 0), (0, 0, 224), (0, 224, 0), (0, 224, 224))
     sub_slice = {"time": "a"}
 
     dim_mapping = d.get_datacube_dimension_mapping(in_dc)
@@ -515,21 +479,18 @@ def test_resolve_batches_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item
 def test_resolve_batches_same_in_out_datetime(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
         da.random.random((5, 4, 2, 2)),
-        dims =["time", "band", "width", "height"],
-        coords = {
+        dims=["time", "band", "width", "height"],
+        coords={
             "time": np.array(
                 ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"],
-                dtype="datetime64[ns]"
+                dtype="datetime64[ns]",
             ),
             "band": ["B1", "B2", "B3", "B4"],
             "width": [100, 110],
-            "height": [200, 210]
-        }
+            "height": [200, 210],
+        },
     )
-    out_dc = xr.DataArray(
-        da.random.random((1, 10, 4)),
-        dims=["batch", "time", "band"]
-    )
+    out_dc = xr.DataArray(da.random.random((1, 10, 4)), dims=["batch", "time", "band"])
 
     mlm_item.ext.mlm.input[0].input.shape = [-1, 5, 4]
     mlm_item.ext.mlm.input[0].input.dim_order = ["batch", "time", "band"]
@@ -539,9 +500,7 @@ def test_resolve_batches_same_in_out_datetime(mlm_item: pystac.Item):
 
     d = DummyMLModel(mlm_item)
 
-    idx_dict = (
-        (0, 0),
-    )
+    idx_dict = ((0, 0),)
     sub_slice = {"width": 100, "height": 200}
 
     dim_mapping = d.get_datacube_dimension_mapping(in_dc)
@@ -553,20 +512,16 @@ def test_resolve_batches_same_in_out_datetime(mlm_item: pystac.Item):
     time_coords_ref = np.linspace(
         np.datetime64("2024-01-01").astype("datetime64[s]").astype(int),
         np.datetime64("2024-01-06").astype("datetime64[s]").astype(int),
-        10, endpoint=False, dtype=int
+        10,
+        endpoint=False,
+        dtype=int,
     ).astype("datetime64[s]")
     assert np.all(time_coords_ref == unbatched.coords["time"].data)
 
 
 def test_resolve_batches_same_in_out_nocoords(mlm_item: pystac.Item):
-    in_dc = xr.DataArray(
-        da.random.random(3),
-        dims=["time"]
-    )
-    out_dc = xr.DataArray(
-        da.random.random((1, 2)),
-        dims=["batch", "time"]
-    )
+    in_dc = xr.DataArray(da.random.random(3), dims=["time"])
+    out_dc = xr.DataArray(da.random.random((1, 2)), dims=["batch", "time"])
 
     mlm_item.ext.mlm.input[0].input.shape = [-1, 3]
     mlm_item.ext.mlm.input[0].input.dim_order = ["batch", "time"]
@@ -576,9 +531,7 @@ def test_resolve_batches_same_in_out_nocoords(mlm_item: pystac.Item):
 
     d = DummyMLModel(mlm_item)
 
-    idx_dict = (
-        (0,),
-    )
+    idx_dict = ((0,),)
     sub_slice = {}
 
     dim_mapping = d.get_datacube_dimension_mapping(in_dc)
@@ -593,16 +546,9 @@ def test_resolve_batches_same_in_out_nocoords(mlm_item: pystac.Item):
 
 def test_resolve_batches_same_in_out_other(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
-        da.random.random(3),
-        dims=["time"],
-        coords={
-            "time": ["t1", "t2", "t3"]
-        }
+        da.random.random(3), dims=["time"], coords={"time": ["t1", "t2", "t3"]}
     )
-    out_dc = xr.DataArray(
-        da.random.random((1, 2)),
-        dims=["batch", "time"]
-    )
+    out_dc = xr.DataArray(da.random.random((1, 2)), dims=["batch", "time"])
 
     mlm_item.ext.mlm.input[0].input.shape = [-1, 3]
     mlm_item.ext.mlm.input[0].input.dim_order = ["batch", "time"]
@@ -612,9 +558,7 @@ def test_resolve_batches_same_in_out_other(mlm_item: pystac.Item):
 
     d = DummyMLModel(mlm_item)
 
-    idx_dict = (
-        (0,),
-    )
+    idx_dict = ((0,),)
     sub_slice = {}
 
     dim_mapping = d.get_datacube_dimension_mapping(in_dc)

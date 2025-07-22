@@ -1,6 +1,7 @@
-from openeo_processes_dask_ml.process_implementations.data_model import MLModel
-import xarray as xr
 import numpy as np
+import xarray as xr
+
+from openeo_processes_dask_ml.process_implementations.data_model import MLModel
 
 
 class DummyMLModel(MLModel):
@@ -27,7 +28,6 @@ class DummyMLModel(MLModel):
         print(out_dc_shape)
 
         r = xr.DataArray(
-            np.random.random(out_dc_shape).astype(out_dtype),
-            dims=out_dims
+            np.random.random(out_dc_shape).astype(out_dtype), dims=out_dims
         )
         return r

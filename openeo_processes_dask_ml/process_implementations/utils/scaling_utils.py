@@ -1,4 +1,5 @@
 import xarray as xr
+
 from pystac.extensions.mlm import ValueScaling, ValueScalingType
 
 
@@ -95,6 +96,4 @@ def scale_datacube(dc: xr.DataArray, scale_obj: ValueScaling) -> xr.DataArray:
             "Custom Processing Expression for Value Scaling are not implemented."
         )
 
-    raise ValueError(
-        f"Invalue ValueScaling Type: {scale_obj.type}"
-    )
+    raise ValueError(f"Invalue ValueScaling Type: {scale_obj.type}")
