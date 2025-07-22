@@ -1,0 +1,1 @@
+from .openeo_minibackend import process_registry
