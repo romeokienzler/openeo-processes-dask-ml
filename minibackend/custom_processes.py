@@ -1,13 +1,14 @@
 import logging
-import xarray as xr
+
 import dask.array as da
+import xarray as xr
 
 logger = logging.getLogger(__name__)
 
 
 # # I/O processes aren't generic (yet), therefore have to custom define those.
 def load_collection(
-        id, spatial_extent, temporal_extent, bands=[], properties={}, **kwargs
+    id, spatial_extent, temporal_extent, bands=[], properties={}, **kwargs
 ):
     msg = (
         "Process 'load_collection' not implemented. Returning random numbers instead. "
@@ -27,18 +28,16 @@ def load_collection(
             "time": ["t_" + str(t) for t in range(n_time)],
             "band": ["B" + str(b) for b in range(1, n_bands + 1)],
             "x": range(n_x),
-            "y": range(n_y)
-        }
+            "y": range(n_y),
+        },
     )
     return x
 
 
-def save_result(data, format='netcdf', options=None):
+def save_result(data, format="netcdf", options=None):
     # No generic implementation available, so need to implement locally!
     if format != "netcdf":
-        logger.warning(
-            "Ignoring parameter 'format': Results will be saved as netcdf"
-        )
+        logger.warning("Ignoring parameter 'format': Results will be saved as netcdf")
     data.attrs = {}
     data.to_netcdf("./result.nc")
     return True

@@ -4,7 +4,6 @@ import logging
 
 from openeo_pg_parser_networkx import ProcessRegistry
 from openeo_pg_parser_networkx.process_registry import Process
-
 from openeo_processes_dask.specs import load_collection as load_collection_spec
 from openeo_processes_dask.specs import save_result as save_result_spec
 
