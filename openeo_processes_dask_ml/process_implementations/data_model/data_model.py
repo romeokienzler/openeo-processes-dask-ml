@@ -248,6 +248,7 @@ class MLModel(ABC):
         missing from the datacube.
         """
         input_bands = self.model_metadata.input[0].bands
+        input_bands_str = [i if isinstance(i, str) else i.name for i in input_bands]
 
         # bands prorety not utilized, list is empty
         if not input_bands:
@@ -256,7 +257,10 @@ class MLModel(ABC):
         # possibilities how the "bands" dimension could be called
         band_dim_name = dim_utils.get_band_dim_name(datacube)
 
-        dc_bands = datacube.coords[band_dim_name]
+        # dc_bands = datacube.coords[band_dim_name]
+        band_coords = datacube.coords[band_dim_name].values.tolist()
+        dc_bands = dim_utils.get_dc_band_names(input_bands_str, band_coords)
+
         band_available_in_datacube: list[bool] = []
         bands_unavailable: list[str] = []
         for band in input_bands:
