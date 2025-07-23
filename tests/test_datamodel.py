@@ -381,7 +381,7 @@ def test_run_model():
 
 def test_resolve_batches_different_in_out_dims(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
-        da.random.random((1, 4, 1, 1)), dims=["time", "band", "width", "height"]
+        da.random.random((1, 4, 20, 20)), dims=["time", "band", "width", "height"]
     )
     out_dc = xr.DataArray(da.random.random((4, 20)), dims=["batch", "embedding"])
 
