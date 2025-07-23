@@ -579,7 +579,9 @@ class MLModel(ABC):
                     if inp_dim_name in ["band", "bands", "channel", "channels"]:
                         continue
 
-                    dims_to_add[inp_dim_name] = [inp_idx]
+                    # get coord in appropriate dim (inp_dim_name) at index (inp_idx)
+                    coord = input_dc_coords[inp_dim_name][inp_idx]
+                    dims_to_add[inp_dim_name] = [coord]
 
                 # inp_dim_name in output cube
                 else:
