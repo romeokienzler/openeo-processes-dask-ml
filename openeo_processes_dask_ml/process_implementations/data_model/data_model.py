@@ -503,7 +503,7 @@ class MLModel(ABC):
         # create subsets of cubes:
         # iterate over each dimension that is not used for model input
 
-        coords = [datacube.coords[d].values.tolist() for d in dims_not_in_model]
+        coords = [datacube.coords[d].values for d in dims_not_in_model]
         idx_sets = itertools.product(*coords)
 
         # todo: handle cases where all dims are model inputs (= no subcube_idx_sets)
