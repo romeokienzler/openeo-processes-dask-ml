@@ -712,7 +712,7 @@ class MLModel(ABC):
                 batch_indices,
                 subcube_idx_set,
                 input_dim_mapping,
-                input_dc.coords,
+                pre_datacube.coords,
             )
 
             resolved_batches.append(resolved_batch)
