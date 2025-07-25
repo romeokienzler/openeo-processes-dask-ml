@@ -113,42 +113,11 @@ class MLModel(ABC):
         model_dims = self.model_metadata.input[0].input.dim_order
         dc_dims = datacube.dims
 
-        def get_dc_dim_name(model_dim_name: str) -> str | None:
-            if model_dim_name in dc_dims:
-                return model_dim_name
-
-            t_dim_names = ["time", "times", "t", "date", "dates", "DATE"]
-            if model_dim_name in t_dim_names:
-                return next((t_dim for t_dim in t_dim_names if t_dim in dc_dims), None)
-
-            b_dim_names = ["band", "bands", "b", "channel", "channels"]
-            if model_dim_name in b_dim_names:
-                return next((b_dim for b_dim in b_dim_names if b_dim in dc_dims), None)
-
-            x_dim_names = ["x", "lon", "lng", "longitude"]
-            if model_dim_name in x_dim_names:
-                return next((x_dim for x_dim in x_dim_names if x_dim in dc_dims), None)
-
-            y_dim_names = ["y", "lat", "latitude"]
-            if model_dim_name in y_dim_names:
-                return next((y_dim for y_dim in y_dim_names if y_dim in dc_dims), None)
-
-            batch_dim_names = ["batch", "batches"]
-            if model_dim_name in batch_dim_names:
-                return next(
-                    (
-                        batch_dim
-                        for batch_dim in batch_dim_names
-                        if batch_dim in dc_dims
-                    ),
-                    None,
-                )
-
-            return None
-
         dim_mapping = []
         for m_dim_name in model_dims:
-            dc_dim_name = get_dc_dim_name(m_dim_name)
+            dc_dim_name = dim_utils.get_alternative_datacube_dim_name(
+                datacube, m_dim_name
+            )
             if dc_dim_name is None:
                 dim_mapping.append(None)
             else:

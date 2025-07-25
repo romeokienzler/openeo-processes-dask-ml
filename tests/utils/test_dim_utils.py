@@ -9,14 +9,64 @@ from openeo_processes_dask_ml.process_implementations.exceptions import (
 from openeo_processes_dask_ml.process_implementations.utils import dim_utils
 
 
-@pytest.mark.parametrize("band_dim_name", ["band", "bands", "b", "channel", "foobar"])
-def test_get_band_dim_name(band_dim_name: str):
-    dc = xr.DataArray(da.random.random((3, 3)), dims=[band_dim_name, "x"])
-    if band_dim_name != "foobar":
-        assert dim_utils.get_band_dim_name(dc) == band_dim_name
+@pytest.mark.parametrize("dim_name", ["band", "bands", "b", "channel", "foobar"])
+def test_get_band_dim_name(dim_name: str):
+    dc = xr.DataArray(da.random.random((2, 2, 2, 2)), dims=["time", dim_name, "y", "x"])
+    if dim_name != "foobar":
+        assert dim_utils.get_band_dim_name(dc) == dim_name
     else:
         with pytest.raises(DimensionMissing):
             dim_utils.get_band_dim_name(dc)
+
+
+@pytest.mark.parametrize("dim_name", ["time", "times", "foobar"])
+def test_get_time_dim_name(dim_name: str):
+    dc = xr.DataArray(da.random.random((2, 2, 2, 2)), dims=[dim_name, "band", "y", "x"])
+    if dim_name != "foobar":
+        assert dim_utils.get_time_dim_name(dc) == dim_name
+    else:
+        with pytest.raises(DimensionMissing):
+            dim_utils.get_time_dim_name(dc)
+
+
+@pytest.mark.parametrize("dim_name", ["x", "lng", "foobar"])
+def test_get_x_dim_name(dim_name: str):
+    dc = xr.DataArray(da.random.random((2, 2)), dims=["y", dim_name])
+    if dim_name != "foobar":
+        assert dim_utils.get_x_dim_name(dc) == dim_name
+    else:
+        with pytest.raises(DimensionMissing):
+            dim_utils.get_x_dim_name(dc)
+
+
+@pytest.mark.parametrize("dim_name", ["y", "lat", "foobar"])
+def test_get_y_dim_name(dim_name: str):
+    dc = xr.DataArray(da.random.random((2, 2)), dims=[dim_name, "x"])
+    if dim_name != "foobar":
+        assert dim_utils.get_y_dim_name(dc) == dim_name
+    else:
+        with pytest.raises(DimensionMissing):
+            dim_utils.get_y_dim_name(dc)
+
+
+@pytest.mark.parametrize("dim_names", [["x", "y"], ["lon", "lat"], ["foo", "bar"]])
+def test_get_spatial_dim_names(dim_names: list[str]):
+    dc = xr.DataArray(da.random.random((2, 2)), dims=dim_names)
+    if dim_names[0] != "foo":
+        assert dim_utils.get_spatial_dim_names(dc) == tuple(dim_names)
+    else:
+        with pytest.raises(DimensionMissing):
+            dim_utils.get_spatial_dim_names(dc)
+
+
+@pytest.mark.parametrize("dim_name", ["x", "times", "y", "lat", "bands"])
+def test_get_alternative_datacube_dim_name(dim_name: str):
+    dc = xr.DataArray(da.random.random(2), dims=[dim_name])
+    d = dim_utils.get_alternative_datacube_dim_name(dc, dim_name)
+    assert dim_name == d
+
+    d = dim_utils.get_alternative_datacube_dim_name(dc, "batch")
+    assert d is None
 
 
 @pytest.mark.parametrize("band_name", ("b04", "B04", "foo"))
