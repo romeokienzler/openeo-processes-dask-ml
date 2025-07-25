@@ -688,8 +688,29 @@ class MLModel(ABC):
 
         # reassemble datacube from subcube
         post_cube = xr.combine_by_coords(resolved_batches)
+        post_cube_reorderd = self.reorder_out_dc_dims(datacube, post_cube)
 
-        return post_cube
+        return post_cube_reorderd
+
+    def reorder_out_dc_dims(
+        self, in_cube: xr.DataArray, out_cube: xr.DataArray
+    ) -> xr.DataArray:
+        spatial_dims = dim_utils.get_spatial_dim_names(in_cube)
+
+        old_non_sptial_dims = [
+            d for d in in_cube.dims if d in out_cube.dims and d not in spatial_dims
+        ]
+
+        new_dims = [d for d in out_cube.dims if d not in in_cube.dims]
+
+        old_spatial_dims = [
+            d for d in in_cube.dims if d in out_cube.dims and d in spatial_dims
+        ]
+
+        dim_order = [*old_non_sptial_dims, *new_dims, *old_spatial_dims]
+
+        reorederd_cube = out_cube.transpose(*dim_order)
+        return reorederd_cube
 
     def select_bands(self, datacube: xr.DataArray) -> xr.DataArray:
         model_inp_bands = self.model_metadata.input[0].bands
