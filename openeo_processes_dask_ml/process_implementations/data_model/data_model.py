@@ -549,7 +549,7 @@ class MLModel(ABC):
                         continue
 
                     # get coord in appropriate dim (inp_dim_name) at index (inp_idx)
-                    coord = input_dc_coords[inp_dim_name][inp_idx]
+                    coord = input_dc_coords[inp_dim_name][inp_idx].data
                     dims_to_add[inp_dim_name] = [coord]
 
                 # inp_dim_name in output cube
