@@ -422,6 +422,49 @@ def test_resolve_batches_different_in_out_dims(mlm_item: pystac.Item):
     assert "band" not in unbatched.dims
 
 
+def test_resolve_batches_different_in_out_dims_spatial(mlm_item: pystac.Item):
+    in_dc = xr.DataArray(
+        da.random.random((1, 4, 20, 20)),
+        dims=["time", "band", "x", "y"],
+        coords={
+            "x": np.linspace(100, 120, 20, endpoint=False),
+            "y": np.linspace(200, 220, 20, endpoint=False),
+        },
+    )
+    out_dc = xr.DataArray(da.random.random((4, 20)), dims=["batch", "embedding"])
+
+    mlm_item.ext.mlm.input[0].input.shape = [-1, 4, 10, 10]
+    mlm_item.ext.mlm.input[0].input.dim_order = ["batch", "channel", "x", "y"]
+
+    mlm_item.ext.mlm.output[0].result.shape = [-1, 20]
+    mlm_item.ext.mlm.output[0].result.dim_order = ["batch", "embedding"]
+    d = DummyMLModel(mlm_item)
+
+    idx_dict = ((0, 0, 0), (0, 0, 10), (0, 10, 0), (0, 10, 10))
+    sub_slice = {"time": "a"}
+
+    dim_mapping = d.get_datacube_dimension_mapping(in_dc)
+
+    unbatched = d.resolve_batch(out_dc, idx_dict, sub_slice, dim_mapping, in_dc.coords)
+
+    assert isinstance(unbatched, xr.DataArray)
+
+    assert "embedding" in unbatched.dims
+
+    assert "x" in unbatched.dims
+    assert "x" in unbatched.coords
+    assert len(unbatched.coords["x"]) == 2
+    assert np.all(unbatched.coords["x"].data == np.array([104.5, 114.5]))
+
+    assert "y" in unbatched.dims
+    assert "y" in unbatched.coords
+    assert len(unbatched.coords["y"]) == 2
+    assert np.all(unbatched.coords["y"].data == np.array([204.5, 214.5]))
+
+    assert "batch" not in unbatched.dims
+    assert "band" not in unbatched.dims
+
+
 def test_resolve_batches_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
         da.random.random((1, 4, 448, 448)),
