@@ -549,108 +549,21 @@ class MLModel(ABC):
                 model_input_shape_without_batch,
                 batch_coord_idxes,
             ):
-                # case: inp_dim_name not in output cube
-                if inp_dim_name not in model_output_dims:
-                    # special case: ignore band dimension
-                    if (
-                        isinstance(inp_dim_name, str)
-                        and inp_dim_name.lower() in dim_utils.band_dim_options
-                    ):
-                        continue
-
-                    if (
-                        inp_dim_name.lower() in dim_utils.spatial_dim_options
-                        and np.issubdtype(
-                            input_dc_coords[inp_dim_name].dtype, np.number
-                        )
-                    ):
-                        # handle spatial coordinates
-
-                        coord_start = input_dc_coords[inp_dim_name][inp_idx].data
-                        coord_end = input_dc_coords[inp_dim_name][
-                            inp_idx + inp_dim_len - 1
-                        ].data
-                        coord = (coord_start + coord_end) / 2
-                    else:
-                        # get coord in appropriate dim (inp_dim_name) at index (inp_idx)
-                        coord = input_dc_coords[inp_dim_name][inp_idx].data
-                    dims_to_add[inp_dim_name] = [coord]
-
-                # inp_dim_name in output cube
-                else:
-                    # get new dim length
-                    new_dim_len = model_output_shape[
-                        model_output_dims.index(inp_dim_name)
-                    ]
-
-                    # get input dc coords for dim
-                    coords_for_dim = input_dc_coords[inp_dim_name].data
-
-                    if inp_dim_name not in input_dc_coords:
-                        # special case: DC does not have coords for a dimension
-                        new_coords = np.array(range(new_dim_len))
-
-                    elif inp_dim_len == new_dim_len:
-                        # special case: length is the same in input and output
-                        # -> simply assign the same coords
-                        new_coords = coords_for_dim[inp_idx : inp_idx + inp_dim_len]
-
-                    elif np.issubdtype(coords_for_dim.dtype, np.number):
-                        # for numeric coords, space them evenly between min and max
-                        coord_start = coords_for_dim[inp_idx]
-                        try:
-                            coord_end = coords_for_dim[inp_idx + inp_dim_len]
-                        except IndexError:
-                            diff = coords_for_dim[1] - coords_for_dim[0]
-                            coord_end = coords_for_dim[-1] + diff
-                        new_coords = np.linspace(
-                            coord_start, coord_end, new_dim_len, endpoint=False
-                        )
-
-                    elif np.issubdtype(coords_for_dim.dtype, np.datetime64):
-                        # for datetime coords, space them evenly between start and end
-                        # This solution is not ideal as time coords are usually not
-                        # spaced evenly in input DC
-                        coords_start = (
-                            coords_for_dim[inp_idx].astype("datetime64[s]").astype(int)
-                        )
-                        try:
-                            coord_end = (
-                                coords_for_dim[inp_idx + inp_dim_len]
-                                .astype("datetime64[s]")
-                                .astype(int)
-                            )
-                        except IndexError:
-                            mean_diff = np.mean(
-                                coords_for_dim[1:] - coords_for_dim[:-1]
-                            )
-                            end_date = coords_for_dim[-1] + mean_diff
-                            coord_end = end_date.astype("datetime64[s]").astype(int)
-                        new_coords = np.linspace(
-                            coords_start,
-                            coord_end,
-                            new_dim_len,
-                            endpoint=False,
-                            dtype=int,
-                        ).astype("datetime64[s]")
-
-                    else:
-                        # all other cases, e.g. str: join input coords,append a number
-                        # ex: B1, B2 -> B1.B2-1, B1.B2-2, B1.B2-3
-                        old_coords = coords_for_dim[inp_idx : inp_idx + inp_dim_len]
-                        new_coords = np.char.add(
-                            ".".join(old_coords) + "-",
-                            np.array(range(new_dim_len)).astype(str),
-                        )
-
-                    dc_slice.coords[inp_dim_name] = new_coords
+                self._resolve_dimension(
+                    dc_slice,
+                    inp_dim_name,
+                    model_output_dims,
+                    model_output_shape,
+                    input_dc_coords,
+                    inp_idx,
+                    inp_dim_len,
+                    dims_to_add,
+                )
 
             if dims_to_add:
                 dc_slice = dc_slice.expand_dims(**dims_to_add)
 
             reshaped_slices.append(dc_slice)
-
-        # omit if dc_dim_len = input_dim_len (12 bands = 12 bands)
 
         # re-combine the previously batched datacube parts
         combined_slices = xr.combine_by_coords(reshaped_slices, data_vars="all")
@@ -662,6 +575,135 @@ class MLModel(ABC):
             )
 
         return combined_slices
+
+    def _resolve_dimension(
+        self,
+        dc_slice: xr.DataArray,
+        inp_dim_name: str,
+        model_output_dims: list[str],
+        model_output_shape: list[int],
+        input_dc_coords: xarray.core.coordinates.DataArrayCoordinates,
+        inp_idx: int,
+        inp_dim_len: int,
+        dims_to_add: dict,
+    ) -> None:
+        # case: inp_dim_name not in output cube
+        if inp_dim_name not in model_output_dims:
+            self._resolve_dimension_not_in_output(
+                inp_dim_name, input_dc_coords, inp_idx, inp_dim_len, dims_to_add
+            )
+
+        # inp_dim_name in output cube
+        else:
+            self._resolve_dimension_in_output(
+                dc_slice,
+                model_output_shape,
+                model_output_dims,
+                inp_dim_name,
+                input_dc_coords,
+                inp_dim_len,
+                inp_idx,
+            )
+
+    def _resolve_dimension_in_output(
+        self,
+        dc_slice: xr.DataArray,
+        model_output_shape: list[int],
+        model_output_dims: list[str],
+        inp_dim_name: str,
+        input_dc_coords: xarray.core.coordinates.DataArrayCoordinates,
+        inp_dim_len: int,
+        inp_idx: int,
+    ) -> None:
+        # get new dim length
+        new_dim_len = model_output_shape[model_output_dims.index(inp_dim_name)]
+
+        # get input dc coords for dim
+        coords_for_dim = input_dc_coords[inp_dim_name].data
+
+        if inp_dim_name not in input_dc_coords:
+            # special case: DC does not have coords for a dimension
+            new_coords = np.array(range(new_dim_len))
+
+        elif inp_dim_len == new_dim_len:
+            # special case: length is the same in input and output
+            # -> simply assign the same coords
+            new_coords = coords_for_dim[inp_idx : inp_idx + inp_dim_len]
+
+        elif np.issubdtype(coords_for_dim.dtype, np.number):
+            # for numeric coords, space them evenly between min and max
+            coord_start = coords_for_dim[inp_idx]
+            try:
+                coord_end = coords_for_dim[inp_idx + inp_dim_len]
+            except IndexError:
+                diff = coords_for_dim[1] - coords_for_dim[0]
+                coord_end = coords_for_dim[-1] + diff
+            new_coords = np.linspace(
+                coord_start, coord_end, new_dim_len, endpoint=False
+            )
+
+        elif np.issubdtype(coords_for_dim.dtype, np.datetime64):
+            # for datetime coords, space them evenly between start and end
+            # This solution is not ideal as time coords are usually not
+            # spaced evenly in input DC
+            coords_start = coords_for_dim[inp_idx].astype("datetime64[s]").astype(int)
+            try:
+                coord_end = (
+                    coords_for_dim[inp_idx + inp_dim_len]
+                    .astype("datetime64[s]")
+                    .astype(int)
+                )
+            except IndexError:
+                mean_diff = np.mean(coords_for_dim[1:] - coords_for_dim[:-1])
+                end_date = coords_for_dim[-1] + mean_diff
+                coord_end = end_date.astype("datetime64[s]").astype(int)
+
+            new_coords = np.linspace(
+                coords_start,
+                coord_end,
+                new_dim_len,
+                endpoint=False,
+                dtype=int,
+            ).astype("datetime64[s]")
+
+        else:
+            # all other cases, e.g. str: join input coords,append a number
+            # ex: B1, B2 -> B1.B2-1, B1.B2-2, B1.B2-3
+            old_coords = coords_for_dim[inp_idx : inp_idx + inp_dim_len]
+            new_coords = np.char.add(
+                ".".join(old_coords) + "-",
+                np.array(range(new_dim_len)).astype(str),
+            )
+
+        dc_slice.coords[inp_dim_name] = new_coords
+
+    def _resolve_dimension_not_in_output(
+        self,
+        inp_dim_name: str,
+        input_dc_coords: xarray.core.coordinates.DataArrayCoordinates,
+        inp_idx: int,
+        inp_dim_len: int,
+        dims_to_add,
+    ):
+        # special case: ignore band dimension
+        if (
+            isinstance(inp_dim_name, str)
+            and inp_dim_name.lower() in dim_utils.band_dim_options
+        ):
+            return
+
+        if inp_dim_name.lower() in dim_utils.spatial_dim_options and np.issubdtype(
+            input_dc_coords[inp_dim_name].dtype, np.number
+        ):
+            # handle spatial coordinates
+
+            coord_start = input_dc_coords[inp_dim_name][inp_idx].data
+            coord_end = input_dc_coords[inp_dim_name][inp_idx + inp_dim_len - 1].data
+            coord = (coord_start + coord_end) / 2
+        else:
+            # get coord in appropriate dim (inp_dim_name) at index (inp_idx)
+            coord = input_dc_coords[inp_dim_name][inp_idx].data
+        dims_to_add[inp_dim_name] = [coord]
 
     def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
         # first check if all dims required by model are in data cube
