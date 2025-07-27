@@ -518,12 +518,17 @@ class MLModel(ABC):
         # set name to None to ensure that combine_by_coords will return a DataArray
         dc_batched.name = None
 
-        model_input_shape = self.model_metadata.input[0].input.shape
-
         # get names of datacube input dimensions
         dc_input_dims = [n[0] if n is not None else None for n in input_dc_dim_mapping]
         # filter out "batch" dimension (is None in mapping)
         dc_input_dims_without_batch = [n for n in dc_input_dims if n is not None]
+
+        model_input_shape = self.model_metadata.input[0].input.shape
+        model_input_shape_without_batch = [
+            d_shape
+            for d_name, d_shape in zip(input_dc_dim_mapping, model_input_shape)
+            if d_name is not None
+        ]
 
         model_output_dims = self.model_metadata.output[0].result.dim_order
         model_output_shape = self.model_metadata.output[0].result.shape
@@ -539,17 +544,36 @@ class MLModel(ABC):
             # dict with dims to be added. Key is dim name, value is coordinate
             dims_to_add = {}
 
-            for inp_dim_name, inp_idx in zip(
-                dc_input_dims_without_batch, batch_coord_idxes
+            for inp_dim_name, inp_dim_len, inp_idx in zip(
+                dc_input_dims_without_batch,
+                model_input_shape_without_batch,
+                batch_coord_idxes,
             ):
                 # case: inp_dim_name not in output cube
                 if inp_dim_name not in model_output_dims:
-                    # special case: band dimension
-                    if inp_dim_name in ["band", "bands", "channel", "channels"]:
+                    # special case: ignore band dimension
+                    if (
+                        isinstance(inp_dim_name, str)
+                        and inp_dim_name.lower() in dim_utils.band_dim_options
+                    ):
                         continue
 
-                    # get coord in appropriate dim (inp_dim_name) at index (inp_idx)
-                    coord = input_dc_coords[inp_dim_name][inp_idx].data
+                    if (
+                        inp_dim_name.lower() in dim_utils.spatial_dim_options
+                        and np.issubdtype(
+                            input_dc_coords[inp_dim_name].dtype, np.number
+                        )
+                    ):
+                        # handle spatial coordinates
+
+                        coord_start = input_dc_coords[inp_dim_name][inp_idx].data
+                        coord_end = input_dc_coords[inp_dim_name][
+                            inp_idx + inp_dim_len - 1
+                        ].data
+                        coord = (coord_start + coord_end) / 2
+                    else:
+                        # get coord in appropriate dim (inp_dim_name) at index (inp_idx)
+                        coord = input_dc_coords[inp_dim_name][inp_idx].data
                     dims_to_add[inp_dim_name] = [coord]
 
                 # inp_dim_name in output cube
@@ -558,7 +582,6 @@ class MLModel(ABC):
                     new_dim_len = model_output_shape[
                         model_output_dims.index(inp_dim_name)
                     ]
-                    old_dim_len = model_input_shape[dc_input_dims.index(inp_dim_name)]
 
                     # get input dc coords for dim
                     coords_for_dim = input_dc_coords[inp_dim_name].data
@@ -567,16 +590,16 @@ class MLModel(ABC):
                         # special case: DC does not have coords for a dimension
                         new_coords = np.array(range(new_dim_len))
 
-                    elif old_dim_len == new_dim_len:
+                    elif inp_dim_len == new_dim_len:
                         # special case: length is the same in input and output
                         # -> simply assign the same coords
-                        new_coords = coords_for_dim[inp_idx : inp_idx + old_dim_len]
+                        new_coords = coords_for_dim[inp_idx : inp_idx + inp_dim_len]
 
                     elif np.issubdtype(coords_for_dim.dtype, np.number):
                         # for numeric coords, space them evenly between min and max
                         coord_start = coords_for_dim[inp_idx]
                         try:
-                            coord_end = coords_for_dim[inp_idx + old_dim_len]
+                            coord_end = coords_for_dim[inp_idx + inp_dim_len]
                         except IndexError:
                             diff = coords_for_dim[1] - coords_for_dim[0]
                             coord_end = coords_for_dim[-1] + diff
@@ -593,7 +616,7 @@ class MLModel(ABC):
                         )
                         try:
                             coord_end = (
-                                coords_for_dim[inp_idx + old_dim_len]
+                                coords_for_dim[inp_idx + inp_dim_len]
                                 .astype("datetime64[s]")
                                 .astype(int)
                             )
@@ -614,7 +637,7 @@ class MLModel(ABC):
                     else:
                         # all other cases, e.g. str: join input coords,append a number
                         # ex: B1, B2 -> B1.B2-1, B1.B2-2, B1.B2-3
-                        old_coords = coords_for_dim[inp_idx : inp_idx + old_dim_len]
+                        old_coords = coords_for_dim[inp_idx : inp_idx + inp_dim_len]
                         new_coords = np.char.add(
                             ".".join(old_coords) + "-",
                             np.array(range(new_dim_len)).astype(str),
