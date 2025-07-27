@@ -9,7 +9,9 @@ from openeo_processes_dask_ml.process_implementations.exceptions import (
 from openeo_processes_dask_ml.process_implementations.utils import dim_utils
 
 
-@pytest.mark.parametrize("dim_name", ["band", "bands", "b", "channel", "foobar"])
+@pytest.mark.parametrize(
+    "dim_name", ["band", "bands", "b", "Band", "B", "channel", "Channel", "foobar"]
+)
 def test_get_band_dim_name(dim_name: str):
     dc = xr.DataArray(da.random.random((2, 2, 2, 2)), dims=["time", dim_name, "y", "x"])
     if dim_name != "foobar":
@@ -19,7 +21,7 @@ def test_get_band_dim_name(dim_name: str):
             dim_utils.get_band_dim_name(dc)
 
 
-@pytest.mark.parametrize("dim_name", ["time", "times", "foobar"])
+@pytest.mark.parametrize("dim_name", ["time", "times", "Time", "foobar"])
 def test_get_time_dim_name(dim_name: str):
     dc = xr.DataArray(da.random.random((2, 2, 2, 2)), dims=[dim_name, "band", "y", "x"])
     if dim_name != "foobar":
@@ -29,7 +31,9 @@ def test_get_time_dim_name(dim_name: str):
             dim_utils.get_time_dim_name(dc)
 
 
-@pytest.mark.parametrize("dim_name", ["x", "lng", "foobar"])
+@pytest.mark.parametrize(
+    "dim_name", ["x", "lng", "X", "longitude", "Longitude", "foobar"]
+)
 def test_get_x_dim_name(dim_name: str):
     dc = xr.DataArray(da.random.random((2, 2)), dims=["y", dim_name])
     if dim_name != "foobar":
@@ -39,7 +43,9 @@ def test_get_x_dim_name(dim_name: str):
             dim_utils.get_x_dim_name(dc)
 
 
-@pytest.mark.parametrize("dim_name", ["y", "lat", "foobar"])
+@pytest.mark.parametrize(
+    "dim_name", ["y", "lat", "Y", "Latitude", "latitude", "foobar"]
+)
 def test_get_y_dim_name(dim_name: str):
     dc = xr.DataArray(da.random.random((2, 2)), dims=[dim_name, "x"])
     if dim_name != "foobar":

@@ -21,9 +21,9 @@ def _find_alternative_dim_name_in_datacube(
     :param dim_name_options: Dimension names to be searched for in the datacube
     :return: The found dimension name
     """
-    for dim_option in dim_name_options:
-        if dim_option in dc.dims:
-            return dim_option
+    for dim_name in dc.dims:
+        if isinstance(dim_name, str) and dim_name.lower() in dim_name_options:
+            return dim_name
     raise ValueError(
         f"The datacube does not contain one of the following dimensions: "
         f"{', '.join(dim_name_options)}"
