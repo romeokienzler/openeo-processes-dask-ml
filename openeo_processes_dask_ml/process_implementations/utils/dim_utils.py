@@ -5,10 +5,12 @@ from openeo_processes_dask_ml.process_implementations.exceptions import (
     BandNotFoundException,
 )
 
+# only add lower-case dimensions. use .lower() when comparing dimension names
 band_dim_options = ["band", "bands", "b", "channel", "channels"]
-time_dim_options = ["time", "times", "t", "date", "dates", "DATE"]
+time_dim_options = ["time", "times", "t", "date", "dates"]
 x_dim_options = ["x", "lon", "lng", "longitude"]
 y_dim_options = ["y", "lat", "latitude"]
+spatial_dim_options = [*x_dim_options, *y_dim_options]
 batch_dim_options = ["batch", "batches"]
 
 
