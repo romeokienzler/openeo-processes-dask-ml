@@ -21,6 +21,14 @@ def test_get_band_dim_name(dim_name: str):
             dim_utils.get_band_dim_name(dc)
 
 
+def test_spatial_dim_options():
+    d = dim_utils.spatial_dim_options
+    assert "x" in d
+    assert "y" in d
+    assert "lat" in d
+    assert "lon" in d
+
+
 @pytest.mark.parametrize("dim_name", ["time", "times", "Time", "foobar"])
 def test_get_time_dim_name(dim_name: str):
     dc = xr.DataArray(da.random.random((2, 2, 2, 2)), dims=[dim_name, "band", "y", "x"])
