@@ -27,6 +27,13 @@ def _secure_hash_objects(*args):
     return hasher.hexdigest()
 
 
+def _write_datacube_to_cache(datacube: xr.DataArray, path: str):
+    if not os.path.exists(DATACUBE_CACHE_DIR):
+        os.makedirs(DATACUBE_CACHE_DIR)
+    with open(path, "wb") as file:
+        pickle.dump(datacube, file)
+
+
 def get_random_datacube(shape: tuple[int, ...], dims: tuple[str, ...]) -> xr.DataArray:
     if len(shape) != len(dims):
         raise ValueError("Length of shape and dim attributes must be the same")
@@ -85,10 +92,6 @@ def load_stac_with_cache(
         )
         dc = dc_lazy.compute()
 
-        if not os.path.exists(DATACUBE_CACHE_DIR):
-            os.makedirs(DATACUBE_CACHE_DIR)
-
-        with open(path, "wb") as file:
-            pickle.dump(dc, file)
+        _write_datacube_to_cache(dc, path)
 
         return dc
