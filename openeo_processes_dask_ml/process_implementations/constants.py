@@ -1,6 +1,8 @@
 import os
 
-MODEL_CACHE_DIR = os.environ.get("MODEL_CACHE_DIR", "./cache/model_cache")
+CACHE_DIR = os.environ.get("CACHE_DIR", "./cache")
+MODEL_CACHE_DIR = os.environ.get("MODEL_CACHE_DIR", f"{CACHE_DIR}/model_cache")
+DATACUBE_CACHE_DIR = os.environ.get("DATACUBE_CACHE_DIR", f"{CACHE_DIR}/datacubes")
 
 S3_MODEL_REPO_ENDPOINT = os.environ.get("S3_MODEL_REPO_ENDPOINT", None)
 S3_MODEL_REPO_ACCESS_KEY_ID = os.environ.get("S3_MODEL_REPO_ACCESS_KEY_ID", None)
