@@ -1,10 +1,10 @@
 from openeo_pg_parser_networkx.process_registry import DEFAULT_NAMESPACE
 
-import minibackend
+import minibackend.openeo_minibackend
 
 
 def test_import():
-    registry = minibackend.process_registry
+    registry = minibackend.openeo_minibackend.process_registry
     registered_processes = registry.store[DEFAULT_NAMESPACE].keys()
 
     # custom process implementations
