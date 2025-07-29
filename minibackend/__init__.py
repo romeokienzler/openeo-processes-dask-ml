@@ -1,1 +1,1 @@
-from .openeo_minibackend import process_registry
+from .execute_graph import execute_graph
