@@ -3,15 +3,19 @@ import xarray as xr
 
 from .data_model import MLModel
 
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+# DEVICE = "cpu"
+
 
 class TorchModel(MLModel):
     def create_model_object(self, filepath: str):
         # todo: consider checkpoint, JIT, export
         self._model_object = torch.jit.load(filepath)
+        self._model_object = self._model_object.to(DEVICE)
         self._model_object.eval()
 
     def execute_model(self, batch: xr.DataArray) -> xr.DataArray:
-        tensor = torch.from_numpy(batch.data)
+        tensor = torch.from_numpy(batch.data).to(DEVICE)
         with torch.no_grad():
             out = self._model_object(tensor)
 
@@ -23,4 +27,5 @@ class TorchModel(MLModel):
 
         out_dims = self.model_metadata.output[0].result.dim_order
         out_cube = xr.DataArray(out_postproc.numpy(), dims=out_dims)
+
         return out_cube
