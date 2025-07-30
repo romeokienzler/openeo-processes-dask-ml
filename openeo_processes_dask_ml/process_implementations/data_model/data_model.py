@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
-import numpy.dtypes
 import xarray as xr
 import xarray.core.coordinates
 from openeo_processes_dask.process_implementations.exceptions import (
@@ -70,8 +69,8 @@ class MLModel(ABC):
                 return model_assets[asset_name]
             else:
                 raise Exception(
-                    f"Provided STAC Item does not have an asset named {asset_name} which "
-                    f"also lists mlm:model as its asset role"
+                    f"Provided STAC Item does not have an asset named {asset_name} "
+                    f"which also lists mlm:model as its asset role"
                 )
 
         # case 3: asset name is not given and there is only one mlm:model asset
