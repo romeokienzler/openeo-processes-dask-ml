@@ -833,20 +833,20 @@ class MLModel(ABC):
 
         return xr.concat(scaled_bands, dim=band_dim_name)
 
-    def preprocess_datacube_expression(self, datacube: xr.DataArray):
-        # todo: is xarray datacube really input/output?
+    def preprocess_datacube_expression(self, datacube: xr.DataArray) -> xr.DataArray:
         pre_proc_expression = self.model_metadata.input[0].pre_processing_function
         if pre_proc_expression is None:
             return datacube
 
         try:
-            proc_expression_utils.run_process_expression(datacube, pre_proc_expression)
+            pre_processing_result = proc_expression_utils.run_process_expression(
+                datacube, pre_proc_expression
+            )
         except ExpressionEvaluationException as e:
             raise Exception(
                 f"Error applying pre-processing function to datacube: {str(e)}"
             )
-        # todo: is this return correct???
-        return proc_expression_utils
+        return pre_processing_result
 
     def postprocess_datacube_expression(self, output_obj):
         post_proc_expression = self.model_metadata.output[0].post_processing_function
