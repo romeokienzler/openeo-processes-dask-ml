@@ -12,7 +12,8 @@ This package is not published on PyPI yet. It can only be used from source
 ## Development environment
 
 1. Clone the repository
-2. Install it using [poetry]: `poetry install --all-extras`
+2. Install it using [poetry](https://python-poetry.org/docs/):
+   `poetry install --all-extras`
 3. :warning: Custom pystac: This implementation uses a custom pystac fork,
    as an implementation of of the [stac:mlm](https://github.com/stac-extensions/mlm)
    extension is not yet merged
