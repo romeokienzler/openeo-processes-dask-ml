@@ -650,17 +650,17 @@ class MLModel(ABC):
             # for datetime coords, space them evenly between start and end
             # This solution is not ideal as time coords are usually not
             # spaced evenly in input DC
-            coords_start = coords_for_dim[inp_idx].astype("datetime64[s]").astype(int)
+            coords_start = coords_for_dim[inp_idx].astype("datetime64[ns]").astype(int)
             try:
                 coord_end = (
                     coords_for_dim[inp_idx + inp_dim_len]
-                    .astype("datetime64[s]")
+                    .astype("datetime64[ns]")
                     .astype(int)
                 )
             except IndexError:
                 mean_diff = np.mean(coords_for_dim[1:] - coords_for_dim[:-1])
                 end_date = coords_for_dim[-1] + mean_diff
-                coord_end = end_date.astype("datetime64[s]").astype(int)
+                coord_end = end_date.astype("datetime64[ns]").astype(int)
 
             new_coords = np.linspace(
                 coords_start,
@@ -668,7 +668,7 @@ class MLModel(ABC):
                 new_dim_len,
                 endpoint=False,
                 dtype=int,
-            ).astype("datetime64[s]")
+            ).astype("datetime64[ns]")
 
         else:
             # all other cases, e.g. str: join input coords,append a number
