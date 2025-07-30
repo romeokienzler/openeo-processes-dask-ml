@@ -13,9 +13,12 @@ This package is not published on PyPI yet. It can only be used from source
 
 1. Clone the repository
 2. Install it using [poetry]: `poetry install --all-extras`
-3. :warning: Custom pystac: This implementation uses a custom pystac fork, as some changes are currently not merged.
+3. :warning: Custom pystac: This implementation uses a custom pystac fork,
+   as an implementation of of the [stac:mlm](https://github.com/stac-extensions/mlm)
+   extension is not yet merged
     - Uninstall pystac: `pip uninstall pystac`
-    - Copy the `pystac` folder from [this fork](https://github.com/jonas-hurst/pystac) into the cloned repository
+    - Copy the `pystac` folder from [this fork](https://github.com/jonas-hurst/pystac)
+      into the cloned repository
 4. Run the test suite: `poetry run pytest`
 
 ### Pre-commit hooks
