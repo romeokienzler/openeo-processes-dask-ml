@@ -740,7 +740,9 @@ class MLModel(ABC):
         # perform inference for each individually
         for subcube_idx_set in subcube_idx_sets:
             # slice datacube by unused dimension coordinates
-            print(subcube_idx_set)
+
+            logger.info(f"Predicting for: {subcube_idx_set}")
+
             subcube = input_dc.sel(**subcube_idx_set)
 
             # run inference on datacube subsets
