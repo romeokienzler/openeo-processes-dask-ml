@@ -731,7 +731,6 @@ class MLModel(ABC):
         subcube_idx_sets = self.get_datacube_subset_indices(input_dc)
 
         n_batches = self.get_batch_size()  # batch size to be used during inference
-        # n_batches = 10
         resolved_batches = []
 
         # get dimension indices of each batch: tuple[tuple[int, ], ...]
