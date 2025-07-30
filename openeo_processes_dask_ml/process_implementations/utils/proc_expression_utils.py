@@ -15,10 +15,23 @@ def _raise_format_not_implemented(f: str):
 
 
 def _run_python(dc: xr.DataArray, expression: str):
-    module_name, function_name = expression.split(":")
+    # expects as expression one of the following:
+    # my_package.my_module:my_processing_function
+    # my_package.my_module:MyClass.my_method
 
+    module_name, asdf = expression.split(":")
     module = importlib.import_module(module_name)
-    fn = module.__getattribute__(function_name)
+
+    asdf_decomposed = asdf.split(".")
+    if len(asdf_decomposed) == 1:
+        fn = module.__getattribute__(asdf_decomposed[0])
+    elif len(asdf_decomposed) == 2:
+        cls = module.__getattribute__(asdf_decomposed[0])
+        fn = cls.__dict__[asdf_decomposed[1]]
+    else:
+        raise NotImplementedError(
+            f"This Python instruction is not implemented to be executed: {asdf_decomposed[1]}"
+        )
     return fn(dc)
 
 
