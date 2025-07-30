@@ -1,4 +1,5 @@
 import itertools
+import logging
 import os.path
 from abc import ABC, abstractmethod
 from typing import Any
@@ -17,15 +18,19 @@ from openeo_processes_dask_ml.process_implementations.constants import MODEL_CAC
 from openeo_processes_dask_ml.process_implementations.exceptions import (
     ExpressionEvaluationException,
     LabelDoesNotExist,
+    ReferenceSystemNotFound,
 )
 from openeo_processes_dask_ml.process_implementations.utils import (
     dim_utils,
     download_utils,
+    epsg_utils,
     model_cache_utils,
     proc_expression_utils,
     scaling_utils,
 )
 from pystac.extensions.mlm import MLMExtension
+
+logger = logging.getLogger(__name__)
 
 
 class MLModel(ABC):
@@ -726,6 +731,7 @@ class MLModel(ABC):
         subcube_idx_sets = self.get_datacube_subset_indices(input_dc)
 
         n_batches = self.get_batch_size()  # batch size to be used during inference
+        # n_batches = 10
         resolved_batches = []
 
         # get dimension indices of each batch: tuple[tuple[int, ], ...]
@@ -735,6 +741,7 @@ class MLModel(ABC):
         # perform inference for each individually
         for subcube_idx_set in subcube_idx_sets:
             # slice datacube by unused dimension coordinates
+            print(subcube_idx_set)
             subcube = input_dc.sel(**subcube_idx_set)
 
             # run inference on datacube subsets
@@ -752,10 +759,8 @@ class MLModel(ABC):
             resolved_batches.append(resolved_batch)
 
         # reassemble datacube from subcube
-        post_cube = xr.combine_by_coords(resolved_batches)
-        post_cube_reorderd = self.reorder_out_dc_dims(datacube, post_cube)
-
-        return post_cube_reorderd
+        post_cube = self.postprocess_datacube(datacube, resolved_batches)
+        return post_cube
 
     def reorder_out_dc_dims(
         self, in_cube: xr.DataArray, out_cube: xr.DataArray
@@ -871,10 +876,22 @@ class MLModel(ABC):
         # todo: datacube padding?
         return preproc_dc_casted
 
-    def postprocess_datacube(self, result_cube) -> xr.DataArray:
-        # todo: output gemäß mlm-spec post-processing transformieren
-        # todo: output zu neuem datacube zusammenführen
-        pass
+    def postprocess_datacube(
+        self, in_datacube: xr.DataArray, resolved_batches: list[xr.DataArray]
+    ) -> xr.DataArray:
+        post_cube = xr.combine_by_coords(resolved_batches)
+        post_cube_reorderd = self.reorder_out_dc_dims(in_datacube, post_cube)
+
+        try:
+            epsg = epsg_utils.get_epsg_from_datacube(in_datacube)
+            post_cube_reorderd.rio.write_crs(epsg, inplace=True)
+        except ReferenceSystemNotFound:
+            logger.warning(
+                "Could not detect the CRS datacube which is used in prediction, "
+                "therefore no reference system is assigned to the prediction output"
+            )
+
+        return post_cube_reorderd
 
     def create_object(self):
         if self._model_object is not None:

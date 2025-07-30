@@ -11,3 +11,7 @@ class ExpressionEvaluationException(OpenEOException):
 
 class BandNotFoundException(OpenEOException):
     pass
+
+
+class ReferenceSystemNotFound(OpenEOException):
+    pass
