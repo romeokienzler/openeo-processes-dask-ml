@@ -5,7 +5,15 @@ from openeo_processes_dask_ml.process_implementations.data_model import MLModel
 
 
 class DummyMLModel(MLModel):
-    # Only for testing purposes
+    """
+    This is a dummy model class that is used only for testing purposes
+    """
+
+    def init_model_for_prediction(self):
+        pass
+
+    def uninit_model_after_prediction(self):
+        pass
 
     def create_model_object(self, filepath: str):
         pass
