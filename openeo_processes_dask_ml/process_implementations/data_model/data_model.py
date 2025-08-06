@@ -735,6 +735,7 @@ class MLModel(ABC):
         # get dimension indices of each batch: tuple[tuple[int, ], ...]
         batch_indices = tuple(self.get_index_subsets(reordered_dc))
 
+        self.init_model_for_prediction()
         # iterate over coordinates of unused dimensions
         # perform inference for each individually
         for subcube_idx_set in subcube_idx_sets:
@@ -760,6 +761,7 @@ class MLModel(ABC):
 
         # reassemble datacube from subcube
         post_cube = self.postprocess_datacube(datacube, resolved_batches)
+        self.uninit_model_after_prediction()
         return post_cube
 
     def reorder_out_dc_dims(
@@ -903,8 +905,38 @@ class MLModel(ABC):
 
     @abstractmethod
     def create_model_object(self, filepath: str):
+        """
+        Create a model object (self._model_object) in the respective framework.
+        :param filepath: Path to the model object
+        :return: None
+        """
+        pass
+
+    @abstractmethod
+    def init_model_for_prediction(self):
+        """
+        Initiate the model object, e.g. move it to the cuda device. This function will
+        be executed before prediction from datacube values.
+        :return: None
+        """
+        pass
+
+    @abstractmethod
+    def uninit_model_after_prediction(self):
+        """
+        Uninitialize the model after model prediction, e.g. take it off the cuda device.
+        This function will be executed after all prediction on the datacube are
+        completed
+        :return: None
+        """
         pass
 
     @abstractmethod
     def execute_model(self, batch: xr.DataArray) -> xr.DataArray:
+        """
+        Make a prediction with the model object
+        :param batch: The object which will be passed to the model to make a
+        prediction on. Must have been transformed to a shape to be accepted by the model
+        :return: None
+        """
         pass
