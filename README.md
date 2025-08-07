@@ -35,3 +35,11 @@ changes before making the commit.
 - `opd-ml-dev-utils` has some scripts that are helpful during development
 - `openeo-processes-dask-ml` the actuall ML process specs and implementations
 - `tests` for pytest
+
+## Acknowledgement
+
+Development within this repository are carried out as part of the
+[Embed2Scale](https://embed2scale.eu/) project and is cofunded by the EU Horizon Europe
+program under Grant Agreement 101131841. Additional funding for this project has been
+provided by the Swiss State Secretariat for Education, Research and Innovation and UK
+Research and Innovation.
