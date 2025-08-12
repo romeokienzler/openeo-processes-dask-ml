@@ -1,3 +1,5 @@
+import difflib
+
 import xarray as xr
 from openeo_processes_dask.process_implementations.exceptions import DimensionMissing
 
@@ -215,3 +217,46 @@ def get_dc_band_names(dc_band_names: list[str], band_names: list[str]) -> list[s
                 break
 
     return bands_in_dc
+
+
+def compare_input_and_output_datacube_dims(
+    input_dims: list[str], output_dims: list[str]
+) -> tuple[list[int], list[int]]:
+    """
+    Compares two lists and finds the indices of added and removed elements.
+
+    Args:
+        input_dims: List of dimensions in input datacube
+        output_dims: list of dimensions in output datacube
+
+    Returns:
+        A tuple containing two lists:
+        - A list of indices of elements removed from list1.
+        - A list of indices of elements added to list2.
+    """
+    matcher = difflib.SequenceMatcher(None, input_dims, output_dims)
+
+    removed_indices = []
+    added_indices = []
+
+    # get_opcodes() returns a list of tuples describing the differences.
+    # Each tuple is (tag, i1, i2, j1, j2)
+    # tag can be 'equal', 'delete', 'insert', or 'replace'.
+    # i1:i2 is the slice from list1.
+    # j1:j2 is the slice from list2.
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "delete":
+            # This block was in list1 but not in list2.
+            # Collect all indices from this block.
+            removed_indices.extend(range(i1, i2))
+
+        elif tag == "insert":
+            # This block is in list2 but was not in list1.
+            added_indices.extend(range(j1, j2))
+
+        elif tag == "replace":
+            # A 'replace' is essentially a 'delete' followed by an 'insert'.
+            removed_indices.extend(range(i1, i2))
+            added_indices.extend(range(j1, j2))
+
+    return removed_indices, added_indices

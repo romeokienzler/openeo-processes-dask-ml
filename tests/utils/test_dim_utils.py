@@ -107,3 +107,29 @@ def test_get_dc_band_names(
 ):
     selected_bands = dim_utils.get_dc_band_names(dc_bands, mlm_bands)
     assert selected_bands == dc_bands_selected
+
+
+@pytest.mark.parametrize(
+    "in_dims, out_dims, truth_removed, truth_added",
+    (
+        (
+            ["batch", "bands", "x", "y", "time"],
+            ["batch", "embedding", "x", "y", "time"],
+            [1],
+            [1],
+        ),
+        (["y", "x"], ["y", "x"], [], []),
+        (["x", "y"], ["x", "y", "time"], [], [2]),
+        (["x", "y", "time"], ["x", "time"], [1], []),
+        (["x", "y"], ["time", "x", "y"], [], [0]),
+    ),
+)
+def test_compare_input_and_output_datacube_dims(
+    in_dims: list[str],
+    out_dims: list[str],
+    truth_removed: list[int],
+    truth_added: list[int],
+):
+    removed, added = dim_utils.compare_input_and_output_datacube_dims(in_dims, out_dims)
+    assert truth_removed == removed
+    assert truth_added == added
