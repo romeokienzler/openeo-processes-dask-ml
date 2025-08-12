@@ -20,12 +20,10 @@ class TorchModel(MLModel):
         self._model_object = torch.jit.load(filepath)
 
     def init_model_for_prediction(self):
-        print("init model")
         self._model_on_device = self._model_object.to(DEVICE)
         self._model_on_device.eval()
 
     def uninit_model_after_prediction(self):
-        print("uninit model")
         self._model_on_device = self._model_on_device.to("cpu")
         del self._model_on_device
         self._model_on_device = None
