@@ -2,7 +2,6 @@ import itertools
 import logging
 import os.path
 from abc import ABC, abstractmethod
-from typing import Any
 
 import dask.delayed
 import numpy as np
@@ -571,6 +570,23 @@ class MLModel(ABC):
 
         return chunk_shape
 
+    def get_chunk_shape(self, in_datacube: xr.DataArray) -> dict[str, int]:
+        """
+        Compute the shape of the blocks into which the datacube is chunked before
+        applying the ML prediction algorithm
+        :return: Diction discribing block shape: key is dimension name, value this
+        dimension's block length
+        """
+        dims_not_in_model = self.get_dims_not_in_model(in_datacube)
+        samples_per_batch = self.get_batch_size()
+        chunk_shape = {}
+        for dim_name in in_datacube.dims:
+            if dim_name in dims_not_in_model:
+                chunk_shape[dim_name] = 1
+            else:
+                chunk_shape[dim_name] = len(in_datacube.coords[dim_name])
+        return chunk_shape
+
     def feed_datacube_to_model(
         self, datacube: np.ndarray, _, n_batches: int, n_target_dims: int
     ) -> np.ndarray:
@@ -606,36 +622,13 @@ class MLModel(ABC):
         )
         return return_array
 
-    def get_datacube_subset_indices(self, datacube: xr.DataArray) -> list[dict]:
-        dims_not_in_model = self.get_dims_not_in_model(datacube)
-
-        # if a "batch" dimension is not in the model, we will take care of that later
-        if "batch" in dims_not_in_model:
-            dims_not_in_model.remove("batch")
-
-        # create subsets of cubes:
-        # iterate over each dimension that is not used for model input
-
-        coords = [datacube.coords[d].values for d in dims_not_in_model]
-        idx_sets = itertools.product(*coords)
-
-        # todo: handle cases where all dims are model inputs (= no subcube_idx_sets)
-
-        subcube_idx_sets = []
-        for idx_set in idx_sets:
-            subset = {
-                dim_name: idx for idx, dim_name in zip(idx_set, dims_not_in_model)
-            }
-            subcube_idx_sets.append(subset)
-            # subcube = datacube.sel(**subset)
-
-        return subcube_idx_sets
-
     def resolve_batch(
         self,
         dc_batched: xr.DataArray,
         batch_indices: tuple[tuple[int, ...], ...],
         input_dc_dim_mapping: list[None | tuple[str, int]],
+        output_dc_dim_mapping: list[str],
+        dims_not_in_model: list[str],
         input_dc_coords: xarray.core.coordinates.DataArrayCoordinates,
     ) -> xr.DataArray:
         """
@@ -643,8 +636,9 @@ class MLModel(ABC):
         temporal datacube
         :param dc_batched: the batched datacube
         :param batch_indices: The indices used to to create the batches
-        :param subcube_slice: The indices used to slice the datacube
         :param input_dc_dim_mapping:
+        :param output_dc_dim_mapping:
+        :dims_not_in_model:
         :param input_dc_coords: Input datacube coordinates
         :return: the un-batched datacube
         """
@@ -655,7 +649,8 @@ class MLModel(ABC):
         # assert each batch dimension has appropriate coordinate indices
         if len(dc_batched.coords["batch"]) != len(batch_indices):
             raise Exception(
-                "Different number of batches in datacube that given in batch_indices"
+                f"Different number of batches in datacube that given in batch_indices:\n"
+                f"{len(dc_batched.coords['batch'])=}, {len(batch_indices)=}"
             )
 
         # set name to None to ensure that combine_by_coords will return a DataArray
@@ -673,11 +668,17 @@ class MLModel(ABC):
             if d_name is not None
         ]
 
-        model_output_dims = self.model_metadata.output[0].result.dim_order
+        model_output_dims = output_dc_dim_mapping
         model_output_shape = self.model_metadata.output[0].result.shape
+
+        # re-attach coordinates for dims not used in the model
+        for d in dims_not_in_model:
+            coords = input_dc_coords[d]
+            dc_batched.coords[d] = coords
 
         reshaped_slices = []
 
+        # resolve "batch" dimension and reassemble datacube
         for batch_idx, batch_coord_idxes in zip(
             dc_batched.coords["batch"], batch_indices
         ):
@@ -831,7 +832,7 @@ class MLModel(ABC):
         else:
             # get coord in appropriate dim (inp_dim_name) at index (inp_idx)
             coord = input_dc_coords[inp_dim_name][inp_idx].data
-        dc_slice.coords[inp_dim_name] = coord
+        dc_slice.coords[inp_dim_name] = [coord]
 
     def run_model(self, datacube: xr.DataArray) -> xr.DataArray:
         # first check if all dims required by model are in data cube
@@ -844,8 +845,6 @@ class MLModel(ABC):
 
         pre_datacube = self.preprocess_datacube(datacube)
 
-        # todo: datacube rechunk?
-
         # dimensions: [*dims-in-model (without "batch"), *dims-not-in-model]
         reordered_dc = self.reorder_dc_dims_for_model_input(pre_datacube)
 
@@ -853,19 +852,17 @@ class MLModel(ABC):
         # with "batch" being wherever it needs to be to satisfy model input
         input_dc = self.reshape_dc_for_input(reordered_dc)
 
-        # get list of datacube subset coordinates
-        # these are dimensions with coordinates that are not used in model input
-        subcube_idx_sets = self.get_datacube_subset_indices(input_dc)
-
         # batch size to be used during inference
         n_batches = self.get_batch_size()
-        resolved_batches = []
 
         # get dimension indices of each batch: tuple[tuple[int, ], ...]
         batch_indices = tuple(self.get_index_subsets(reordered_dc))
 
         dims_not_in_model = self.get_dims_not_in_model(datacube)
-        new_chunked = input_dc.chunk({d: 1 for d in dims_not_in_model})
+        chunk_shape = self.get_chunk_shape(input_dc)
+        new_chunked = input_dc.chunk(chunk_shape)
+
+        output_dim_mapping = self.get_datacube_output_dimension_mapping(input_dc)
 
         dims_removed, dims_added = self.compare_input_output_dimensions(input_dc)
         chunk_out_shape = self.get_chunk_output_shape(input_dc)
@@ -915,9 +912,14 @@ class MLModel(ABC):
             model_out, dims=self.get_output_datacube_dimensions(input_dc)
         )
 
-        # re-attach coordinates
+        # resolve "batch" dimension in datacube
         resolved_datacube = self.resolve_batch(
-            model_out_datacube, batch_indices, input_dim_mapping, pre_datacube.coords
+            model_out_datacube,
+            batch_indices,
+            input_dim_mapping,
+            output_dim_mapping,
+            dims_not_in_model,
+            pre_datacube.coords,
         )
 
         post_cube = self.postprocess_datacube(datacube, resolved_datacube)
