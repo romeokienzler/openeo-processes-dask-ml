@@ -6,7 +6,6 @@ import pystac
 from .data_model import MLModel
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-DEVICE = "cpu"
 
 
 class TorchModel(MLModel):
