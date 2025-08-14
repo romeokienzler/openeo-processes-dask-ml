@@ -167,6 +167,17 @@ def test_get_datacube_dimension_mapping(
             assert mapped_dim_name == dc_dim_names[map_idx]
 
 
+def test_get_datacube_output_dimension_mapping(mlm_item):
+    mlm_item.ext.mlm.input[0].input.dim_order = ["batch", "lat", "lon", "band"]
+    mlm_item.ext.mlm.output[0].result.dim_order = ["batch", "lat", "lon", "band", "foo"]
+    d = DummyMLModel(mlm_item)
+
+    dc = xr.DataArray(da.random.random((1, 1, 1, 1)), dims=["batch", "y", "x", "bands"])
+
+    out_mapping = d.get_datacube_output_dimension_mapping(dc)
+    assert out_mapping == ["batch", "y", "x", "bands", "foo"]
+
+
 @pytest.mark.parametrize(
     "dc_dims, ignore_batch, valid",
     (
@@ -334,6 +345,22 @@ def test_check_datacube_dimensions(
             d.check_datacube_dimensions(dc, True)
 
 
+def test_get_index_subsets(mlm_item):
+    mlm_item.ext.mlm.input[0].input.dim_order = ["batch", "x", "y"]
+    mlm_item.ext.mlm.input[0].input.shape = [-1, 2, 2]
+    d = DummyMLModel(mlm_item)
+
+    dc = xr.DataArray(da.random.random((5, 5, 2)), dims=["x", "y", "time"])
+
+    idxes = list(d.get_index_subsets(dc))
+    print(idxes)
+    assert len(idxes) == 4
+    assert (0, 0) in idxes
+    assert (0, 2) in idxes
+    assert (2, 0) in idxes
+    assert (2, 2) in idxes
+
+
 @pytest.mark.parametrize(
     "model_bands",
     (
@@ -355,6 +382,15 @@ def test_select_bands(mlm_item: pystac.Item, model_bands: list[str | mlm.ModelBa
 
     new_dc = d.select_bands(dc)
     assert new_dc.coords["bands"].values.tolist() == ["B04", "B08"]
+
+
+def test_reorder_dc_dims_for_model_input(mlm_item: pystac.Item):
+    d = DummyMLModel(mlm_item)
+    dc = xr.DataArray(da.random.random((1, 1, 1)), dims=["height", "width", "channel"])
+
+    assert dc.dims == ("height", "width", "channel")
+    new_dc = d.reorder_dc_dims_for_model_input(dc)
+    assert new_dc.dims == ("channel", "width", "height")
 
 
 def test_reshape_dc_for_input(mlm_item: pystac.Item):
