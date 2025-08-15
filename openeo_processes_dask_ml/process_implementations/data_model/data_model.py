@@ -578,7 +578,6 @@ class MLModel(ABC):
         dimension's block length
         """
         dims_not_in_model = self.get_dims_not_in_model(in_datacube)
-        samples_per_batch = self.get_batch_size()
         chunk_shape = {}
         for dim_name in in_datacube.dims:
             if dim_name in dims_not_in_model:
