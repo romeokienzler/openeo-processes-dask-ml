@@ -435,6 +435,7 @@ class MLModel(ABC):
         batch_in_dimensions = "batch" in dim_order
 
         # todo figure out a good fallback, take RAM, VRAM into consideration
+        # todo: dont hard-code fallback value
         fallback_batch_size = 12
 
         # 1) no batch size anywhere

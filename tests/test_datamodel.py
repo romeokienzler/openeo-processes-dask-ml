@@ -414,7 +414,7 @@ def test_reshape_dc_for_input(mlm_item: pystac.Item):
         (None, None, 1),
         (5, None, 5),
         (None, 3, 3),
-        (None, -1, 12),  # todo use fallback
+        (None, -1, 12),  # todo: dont hard-code fallback value
         (5, 3, 3),
         (5, 5, 5),
         (5, -1, 5),
