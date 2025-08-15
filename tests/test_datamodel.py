@@ -1,7 +1,5 @@
-import os
 import unittest.mock
 from datetime import datetime
-from typing import Type
 
 import dask.array as da
 import numpy as np
@@ -18,7 +16,6 @@ from openeo_processes_dask_ml.process_implementations.exceptions import (
 )
 from pystac.extensions import mlm
 from tests.dummy.dummy_ml_model import DummyMLModel
-from tests.utils_for_testing.tmp_folder import clear_tmp_folder, prepare_tmp_folder
 
 
 @pytest.fixture
@@ -411,6 +408,136 @@ def test_reshape_dc_for_input(mlm_item: pystac.Item):
     print("- - - - -")
 
 
+@pytest.mark.parametrize(
+    "batch_recomm, batch_dim_shp, true_batch_size",
+    (
+        (None, None, 1),
+        (5, None, 5),
+        (None, 3, 3),
+        (None, -1, 12),  # todo use fallback
+        (5, 3, 3),
+        (5, 5, 5),
+        (5, -1, 5),
+    ),
+)
+def test_get_batch_size(
+    mlm_item: pystac.Item, batch_recomm: int, batch_dim_shp: int, true_batch_size: int
+):
+    in_dims = []
+    shape = []
+    if batch_dim_shp is not None:
+        in_dims.append("batch")
+        shape.append(batch_dim_shp)
+
+    mlm_item.ext.mlm.batch_size_suggestion = batch_recomm
+    mlm_item.ext.mlm.input[0].input.dim_order = in_dims
+    mlm_item.ext.mlm.input[0].input.shape = shape
+    d = DummyMLModel(mlm_item)
+
+    b_size = d.get_batch_size()
+    assert b_size == true_batch_size
+
+
+@pytest.mark.parametrize(
+    "in_dc_dims, out_mlm_dims, out_dc_dims",
+    (
+        (
+            ["batch", "bands", "y", "x", "time"],
+            ["batch", "embedding"],
+            ["batch", "embedding", "y", "x", "time"],
+        ),
+        (["time"], ["batch", "time"], ["batch", "time"]),
+    ),
+)
+def test_get_output_datacube_dimensions(
+    mlm_item: pystac.Item,
+    in_dc_dims: list[str],
+    out_mlm_dims: list[str],
+    out_dc_dims: list[str],
+):
+    mlm_item.ext.mlm.input[0].input.dim_order = in_dc_dims
+    mlm_item.ext.mlm.output[0].result.dim_order = out_mlm_dims
+    d = DummyMLModel(mlm_item)
+
+    in_dc = xr.DataArray(da.random.random([1 for _ in in_dc_dims]), dims=in_dc_dims)
+
+    out_dc_dims_computed = d.get_output_datacube_dimensions(in_dc)
+    assert out_dc_dims == out_dc_dims_computed
+
+
+@pytest.mark.parametrize(
+    "in_dc_dims, out_mlm_dims, diff",
+    (
+        (["batch", "bands", "y", "x", "time"], ["batch", "emb"], ([1], [1])),
+        (["batch", "bands", "y", "x", "time"], ["batch", "emb", "foo"], ([1], [1, 2])),
+        (["batch", "time"], ["batch", "time"], ([], [])),
+        (["batch", "time"], ["batch", "time", "foo"], ([], [2])),
+        (["batch", "time"], ["foo", "batch", "time"], ([], [0])),
+    ),
+)
+def test_compare_input_output_dimensions(
+    mlm_item: pystac.Item,
+    in_dc_dims: list[str],
+    out_mlm_dims: list[str],
+    diff: tuple[list[int], list[int]],
+):
+    mlm_item.ext.mlm.input[0].input.dim_order = in_dc_dims
+    mlm_item.ext.mlm.output[0].result.dim_order = out_mlm_dims
+    d = DummyMLModel(mlm_item)
+
+    in_dc = xr.DataArray(da.random.random([1 for _ in in_dc_dims]), dims=in_dc_dims)
+
+    compare = d.compare_input_output_dimensions(in_dc)
+    assert diff == compare
+
+
+def test_get_chunk_output_shape(mlm_item: pystac.Item):
+    in_dims = ["batch", "bands", "y", "x"]
+    mlm_item.ext.mlm.input[0].input.dim_order = in_dims
+    mlm_item.ext.mlm.input[0].input.shape = [-1, 12, 224, 224]
+
+    mlm_item.ext.mlm.output[0].result.dim_order = ["batch", "emb"]
+    mlm_item.ext.mlm.output[0].result.shape = [-1, 20]
+
+    d = DummyMLModel(mlm_item)
+    in_dc = xr.DataArray(
+        da.random.random((10, 12, 224, 224, 3)),
+        dims=["batch", "bands", "y", "x", "time"],
+    )
+
+    chunk_out_shape = d.get_chunk_output_shape(in_dc)
+
+    assert len(chunk_out_shape) == 5
+    assert chunk_out_shape == (10, 20, 1, 1, 1)
+
+
+def test_get_chunk_shape(mlm_item):
+    in_dims = ["batch", "bands", "y", "x"]
+    mlm_item.ext.mlm.input[0].input.dim_order = in_dims
+    d = DummyMLModel(mlm_item)
+
+    in_dc = xr.DataArray(
+        da.random.random((10, 12, 224, 224, 3)),
+        dims=["batch", "bands", "y", "x", "time"],
+    )
+
+    chunks_shape = d.get_chunk_shape(in_dc)
+
+    assert len(chunks_shape) == 5
+
+    assert "batch" in chunks_shape
+    assert "bands" in chunks_shape
+    assert "y" in chunks_shape
+    assert "x" in chunks_shape
+    assert "time" in chunks_shape
+
+    assert chunks_shape["batch"] == 10
+    assert chunks_shape["bands"] == 12
+    assert chunks_shape["y"] == 224
+    assert chunks_shape["x"] == 224
+    assert chunks_shape["time"] == 1
+
+
 def test_preprocessing_datacube_expression(mlm_item: pystac.Item):
     p = mlm.ProcessingExpression.create(
         "python", "tests.utils.test_proc_expression_utils:function_for_testing"
@@ -439,7 +566,7 @@ def test_postprocess_datacube_expression(mlm_item: pystac.Item):
     assert np.all(res.data == np.array((4, 8, 12)))
 
 
-def test_run_model():
+def test_feed_datacube_to_model():
     pass
 
 
@@ -707,3 +834,22 @@ def test_resolve_batches_same_in_out_other(mlm_item: pystac.Item):
     assert len(unbatched.coords["time"]) == 2
     coord_ref = np.array(["t1.t2.t3-0", "t1.t2.t3-1"])
     assert np.all(unbatched.coords["time"].data == coord_ref)
+
+
+def test_run_model():
+    pass
+
+
+def test_reorder_out_dc_dims(mlm_item: pystac.Item):
+    in_dc = xr.DataArray(
+        da.random.random((1, 1, 1, 1)), dims=["time", "bands", "y", "x"]
+    )
+
+    out_dc = xr.DataArray(
+        da.random.random((1, 1, 1, 1)), dims=["embedding", "x", "y", "time"]
+    )
+
+    d = DummyMLModel(mlm_item)
+    reordered = d.reorder_out_dc_dims(in_dc, out_dc)
+    assert len(reordered.dims) == 4
+    assert reordered.dims == ("time", "embedding", "y", "x")
