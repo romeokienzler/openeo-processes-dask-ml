@@ -679,11 +679,11 @@ def test_resolve_batches_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item
         },
     )
     out_dc = xr.DataArray(
-        da.random.random((4, 4, 20, 20, 1)),
+        da.random.random((4, 4, 4, 4, 1)),
         dims=["batch", "band", "width", "height", "time"],
     )
 
-    out_shape = [-1, 4, 20, 20]
+    out_shape = [-1, 4, 4, 4]
     out_dims = ["batch", "band", "width", "height"]
 
     mlm_item.ext.mlm.output[0].result.shape = out_shape
@@ -712,14 +712,14 @@ def test_resolve_batches_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item
 
     assert "width" in unbatched.dims
     assert "width" in unbatched.coords
-    assert len(unbatched.coords["width"]) == 40
-    coords_ref = np.round(np.linspace(100, 548, 40, endpoint=False))
+    assert len(unbatched.coords["width"]) == 8
+    coords_ref = np.round(np.linspace(128, 520, 8))
     coords_given = np.round(unbatched.coords["width"].data)
     assert np.all(coords_ref == coords_given)
 
     assert "height" in unbatched.dims
     assert "height" in unbatched.coords
-    assert len(unbatched.coords["height"]) == 40
+    assert len(unbatched.coords["height"]) == 8
 
     assert "band" in unbatched.dims
     assert "band" in unbatched.coords

@@ -760,17 +760,23 @@ class MLModel(ABC):
             # -> simply assign the same coords
             new_coords = coords_for_dim[inp_idx : inp_idx + inp_dim_len]
 
+        elif inp_dim_len == 1:
+            # todo
+            pass
+
+        # elif new_dim_len == 1:
+        #     # todo: is this even necessary? or is it cought below
+        #     pass
+
         elif np.issubdtype(coords_for_dim.dtype, np.number):
             # for numeric coords, space them evenly between min and max
-            coord_start = coords_for_dim[inp_idx]
-            try:
-                coord_end = coords_for_dim[inp_idx + inp_dim_len]
-            except IndexError:
-                diff = coords_for_dim[1] - coords_for_dim[0]
-                coord_end = coords_for_dim[-1] + diff
-            new_coords = np.linspace(
-                coord_start, coord_end, new_dim_len, endpoint=False
-            )
+            coord_width = coords_for_dim[1] - coords_for_dim[0]
+            image_start = coords_for_dim[inp_idx] - coord_width / 2
+            image_end = coords_for_dim[inp_idx + inp_dim_len - 1] + coord_width / 2
+            new_coord_width = (image_end - image_start) / new_dim_len
+            coord_start = image_start + new_coord_width / 2
+            coord_end = image_end - new_coord_width / 2
+            new_coords = np.linspace(coord_start, coord_end, new_dim_len)
 
         elif np.issubdtype(coords_for_dim.dtype, np.datetime64):
             # for datetime coords, space them evenly between start and end
