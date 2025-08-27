@@ -1,3 +1,7 @@
+"""
+This model tests the resolve_batches() function from the datamodel.
+"""
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -7,7 +11,7 @@ import pystac
 from tests.dummy.dummy_ml_model import DummyMLModel
 
 
-def test_resolve_batches_different_in_out_dims(mlm_item: pystac.Item):
+def test_different_in_out_dims(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
         da.random.random((1, 4, 20, 20)),
         dims=["time", "band", "width", "height"],
@@ -56,7 +60,7 @@ def test_resolve_batches_different_in_out_dims(mlm_item: pystac.Item):
     assert "band" not in unbatched.dims
 
 
-def test_resolve_batches_different_in_out_dims_spatial(mlm_item: pystac.Item):
+def test_different_in_out_dims_spatial(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
         da.random.random((1, 4, 20, 20)),
         dims=["time", "band", "x", "y"],
@@ -104,7 +108,7 @@ def test_resolve_batches_different_in_out_dims_spatial(mlm_item: pystac.Item):
     assert "band" not in unbatched.dims
 
 
-def test_resolve_batches_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item):
+def test_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
         da.random.random((1, 4, 448, 448)),
         dims=["time", "band", "width", "height"],
@@ -149,7 +153,7 @@ def test_resolve_batches_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item
 
     assert "width" in unbatched.dims
     assert "width" in unbatched.coords
-    assert len(unbatched.coords["width"]) == 8
+    assert len(unbatched.coords["width"]) == 8  # todo
     coords_ref = np.round(np.linspace(128, 520, 8))
     coords_given = np.round(unbatched.coords["width"].data)
     assert np.all(coords_ref == coords_given)
@@ -166,7 +170,7 @@ def test_resolve_batches_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item
     assert "batch" not in unbatched.dims
 
 
-def test_resolve_batches_same_in_out_datetime(mlm_item: pystac.Item):
+def test_same_in_out_datetime(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
         da.random.random((5, 4, 2, 2)),
         dims=["time", "band", "width", "height"],
@@ -219,7 +223,7 @@ def test_resolve_batches_same_in_out_datetime(mlm_item: pystac.Item):
     assert np.all(time_coords_ref == unbatched.coords["time"].data)
 
 
-def test_resolve_batches_same_in_out_nocoords(mlm_item: pystac.Item):
+def test_same_in_out_nocoords(mlm_item: pystac.Item):
     in_dc = xr.DataArray(da.random.random(3), dims=["time"])
     out_dc = xr.DataArray(da.random.random((1, 2)), dims=["batch", "time"])
 
@@ -245,7 +249,7 @@ def test_resolve_batches_same_in_out_nocoords(mlm_item: pystac.Item):
     assert np.all(unbatched.coords["time"].data == coord_ref)
 
 
-def test_resolve_batches_same_in_out_other(mlm_item: pystac.Item):
+def test_same_in_out_other(mlm_item: pystac.Item):
     in_dc = xr.DataArray(
         da.random.random(3), dims=["time"], coords={"time": ["t1", "t2", "t3"]}
     )
