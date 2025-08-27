@@ -153,7 +153,7 @@ def test_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item):
 
     assert "width" in unbatched.dims
     assert "width" in unbatched.coords
-    assert len(unbatched.coords["width"]) == 8  # todo
+    assert len(unbatched.coords["width"]) == 8
     coords_ref = np.round(np.linspace(128, 520, 8))
     coords_given = np.round(unbatched.coords["width"].data)
     assert np.all(coords_ref == coords_given)
@@ -168,6 +168,94 @@ def test_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item):
     assert np.all(unbatched.coords["band"].data == np.array(["B1", "B2", "B3", "B4"]))
 
     assert "batch" not in unbatched.dims
+
+
+def test_same_in_out_dims_numeric_len_1(mlm_item: pystac.Item):
+    in_dc = xr.DataArray(
+        da.random.random((1, 4, 448, 448)),
+        dims=["time", "band", "width", "height"],
+        coords={
+            "band": ["B1", "B2", "B3", "B4"],
+            "width": range(100, 100 + 448),
+            "height": range(100, 100 + 448),
+            "time": ["a"],
+        },
+    )
+    out_dc = xr.DataArray(
+        da.random.random((4, 4, 1, 1, 1)),
+        dims=["batch", "band", "width", "height", "time"],
+    )
+
+    out_shape = [-1, 4, 1, 1]
+    out_dims = ["batch", "band", "width", "height"]
+
+    mlm_item.ext.mlm.output[0].result.shape = out_shape
+    mlm_item.ext.mlm.output[0].result.dim_order = out_dims
+    d = DummyMLModel(mlm_item)
+
+    idx_dict = ((0, 0, 0), (0, 0, 224), (0, 224, 0), (0, 224, 224))
+
+    dim_mapping = d.get_datacube_dimension_mapping(in_dc)
+
+    unbatched = d.resolve_batch(
+        out_dc,
+        idx_dict,
+        dim_mapping,
+        ["batch", "band", "width", "height"],
+        ["time"],
+        in_dc.coords,
+    )
+
+    assert "width" in unbatched.dims
+    assert "width" in unbatched.coords
+    assert len(unbatched.coords["width"]) == 2
+    coords_ref = np.round(np.linspace(212, 436, 2))
+    coords_given = np.round(unbatched.coords["width"].data)
+    assert np.all(coords_ref == coords_given)
+
+
+def test_same_in_out_dims_numeric_len_higher(mlm_item: pystac.Item):
+    in_dc = xr.DataArray(
+        da.random.random((1, 4, 448, 448)),
+        dims=["time", "band", "width", "height"],
+        coords={
+            "band": ["B1", "B2", "B3", "B4"],
+            "width": range(100, 100 + 448),
+            "height": range(100, 100 + 448),
+            "time": ["a"],
+        },
+    )
+    out_dc = xr.DataArray(
+        da.random.random((4, 4, 448, 448, 1)),
+        dims=["batch", "band", "width", "height", "time"],
+    )
+
+    out_shape = [-1, 4, 448, 448]
+    out_dims = ["batch", "band", "width", "height"]
+
+    mlm_item.ext.mlm.output[0].result.shape = out_shape
+    mlm_item.ext.mlm.output[0].result.dim_order = out_dims
+    d = DummyMLModel(mlm_item)
+
+    idx_dict = ((0, 0, 0), (0, 0, 224), (0, 224, 0), (0, 224, 224))
+
+    dim_mapping = d.get_datacube_dimension_mapping(in_dc)
+
+    unbatched = d.resolve_batch(
+        out_dc,
+        idx_dict,
+        dim_mapping,
+        ["batch", "band", "width", "height"],
+        ["time"],
+        in_dc.coords,
+    )
+
+    assert "width" in unbatched.dims
+    assert "width" in unbatched.coords
+    assert len(unbatched.coords["width"]) == 896
+    coords_ref = np.round(np.linspace(99.75, 547.25, 896), 2)
+    coords_given = np.round(unbatched.coords["width"].data, 2)
+    assert np.all(coords_ref == coords_given)
 
 
 def test_same_in_out_datetime(mlm_item: pystac.Item):
