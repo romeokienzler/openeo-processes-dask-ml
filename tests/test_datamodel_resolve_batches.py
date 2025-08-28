@@ -12,6 +12,9 @@ from tests.dummy.dummy_ml_model import DummyMLModel
 
 
 def test_different_in_out_dims(mlm_item: pystac.Item):
+    """
+    Different dimensions in input and output
+    """
     in_dc = xr.DataArray(
         da.random.random((1, 4, 20, 20)),
         dims=["time", "band", "width", "height"],
@@ -61,6 +64,9 @@ def test_different_in_out_dims(mlm_item: pystac.Item):
 
 
 def test_different_in_out_dims_spatial(mlm_item: pystac.Item):
+    """
+    Different dimensions in input and output, but spatial dimensions exist
+    """
     in_dc = xr.DataArray(
         da.random.random((1, 4, 20, 20)),
         dims=["time", "band", "x", "y"],
@@ -109,6 +115,9 @@ def test_different_in_out_dims_spatial(mlm_item: pystac.Item):
 
 
 def test_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item):
+    """
+    Same dimensoins in input and output, with extra time dimension not used in model
+    """
     in_dc = xr.DataArray(
         da.random.random((1, 4, 448, 448)),
         dims=["time", "band", "width", "height"],
@@ -171,6 +180,9 @@ def test_same_in_out_dims_numeric_same_len(mlm_item: pystac.Item):
 
 
 def test_same_in_out_dims_numeric_len_1(mlm_item: pystac.Item):
+    """
+    Same dimension in input and output, but length of dimensions is 1
+    """
     in_dc = xr.DataArray(
         da.random.random((1, 4, 448, 448)),
         dims=["time", "band", "width", "height"],
@@ -215,6 +227,9 @@ def test_same_in_out_dims_numeric_len_1(mlm_item: pystac.Item):
 
 
 def test_same_in_out_dims_numeric_len_higher(mlm_item: pystac.Item):
+    """
+    Same dimensions in input and output, and longer length in output
+    """
     in_dc = xr.DataArray(
         da.random.random((1, 4, 448, 448)),
         dims=["time", "band", "width", "height"],
@@ -259,6 +274,9 @@ def test_same_in_out_dims_numeric_len_higher(mlm_item: pystac.Item):
 
 
 def test_same_in_out_datetime(mlm_item: pystac.Item):
+    """
+    Same dimension in input and output. Time dim length is smaller in output than input
+    """
     in_dc = xr.DataArray(
         da.random.random((5, 4, 2, 2)),
         dims=["time", "band", "width", "height"],
@@ -312,6 +330,9 @@ def test_same_in_out_datetime(mlm_item: pystac.Item):
 
 
 def test_same_in_out_nocoords(mlm_item: pystac.Item):
+    """
+    Same dims in input and output, but one in-dimension has no coords
+    """
     in_dc = xr.DataArray(da.random.random(3), dims=["time"])
     out_dc = xr.DataArray(da.random.random((1, 2)), dims=["batch", "time"])
 
@@ -338,6 +359,9 @@ def test_same_in_out_nocoords(mlm_item: pystac.Item):
 
 
 def test_same_in_out_other(mlm_item: pystac.Item):
+    """
+    Same dimensoin in input and output, but coords are not numeric or datetime
+    """
     in_dc = xr.DataArray(
         da.random.random(3), dims=["time"], coords={"time": ["t1", "t2", "t3"]}
     )
