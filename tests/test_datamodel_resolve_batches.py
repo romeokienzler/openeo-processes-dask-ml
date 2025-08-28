@@ -275,7 +275,7 @@ def test_same_in_out_dims_numeric_len_higher(mlm_item: pystac.Item):
 
 def test_same_in_out_datetime(mlm_item: pystac.Item):
     """
-    Same dimension in input and output. Time dim length is smaller in output than input
+    Same dimension in input and output. Time dim length is higher in output than input
     """
     in_dc = xr.DataArray(
         da.random.random((5, 4, 2, 2)),
