@@ -1,0 +1,226 @@
+{
+    "stac_version": "1.0.0",
+    "stac_extensions": [
+        "https://stac-extensions.github.io/mlm/v1.4.0/schema.json",
+        "https://stac-extensions.github.io/raster/v1.1.0/schema.json"
+    ],
+    "type": "Feature",
+    "id": "terratorch_prithvi_eo_v2_600",
+    "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+            [
+                [
+                    -180.0,
+                    -90.0
+                ],
+                [
+                    -180.0,
+                    90.0
+                ],
+                [
+                    180.0,
+                    90.0
+                ],
+                [
+                    180.0,
+                    -90.0
+                ],
+                [
+                    -180.0,
+                    -90.0
+                ]
+            ]
+        ]
+    },
+    "bbox": [
+        -180.0,
+        -90.0,
+        180.0,
+        90.0
+    ],
+    "properties": {
+        "description": "Prithvi EO v2 (600M) foundation model wrapped in TerraTorch. Accepts 6 Sentinel-2 bands (224×224) and outputs embeddings.",
+        "datetime": "1900-01-01T00:00:00Z",
+        "mlm:name": "terratorch_prithvi_eo_v2_600",
+        "mlm:tasks": [
+            "classification"
+        ],
+        "mlm:architecture": "Prithvi-EO v2 600M",
+        "mlm:framework": "pytorch",
+        "mlm:framework_version": "2.3.0",
+        "mlm:accelerator": "cuda",
+        "mlm:input": [
+            {
+                "name": "Sentinel-2 Reflectance (Prithvi EO v2 600M)",
+                "constellation": "sentinel-2",
+                "processing_level": "L2A",
+                "bands": [
+                    "BLUE",
+                    "GREEN",
+                    "RED",
+                    "NIR_NARROW",
+                    "SWIR_1",
+                    "SWIR_2"
+                ],
+                "input": {
+                    "shape": [
+                        -1,
+                        6,
+                        224,
+                        224
+                    ],
+                    "dim_order": [
+                        "batch",
+                        "channel",
+                        "y",
+                        "x"
+                    ],
+                    "data_type": "float32"
+                },
+                "value_scaling": [
+                    {
+                        "type": "z-score",
+                        "mean": 0.1412956,
+                        "stddev": 0.07406382
+                    },
+                    {
+                        "type": "z-score",
+                        "mean": 0.13795798,
+                        "stddev": 0.07370365
+                    },
+                    {
+                        "type": "z-score",
+                        "mean": 0.12353792,
+                        "stddev": 0.08692279
+                    },
+                    {
+                        "type": "z-score",
+                        "mean": 0.30902815,
+                        "stddev": 0.11798815
+                    },
+                    {
+                        "type": "z-score",
+                        "mean": 0.2044958,
+                        "stddev": 0.09772074
+                    },
+                    {
+                        "type": "z-score",
+                        "mean": 0.11912015,
+                        "stddev": 0.07659938
+                    }
+                ],
+                "resize_type": null,
+                "pre_processing_function": null
+            }
+        ],
+        "mlm:output": [
+            {
+                "name": "embedding vector",
+                "tasks": [
+                    "classification"
+                ],
+                "result": {
+                    "shape": [
+                        -1,
+                        1,
+                        1,
+                        1024
+                    ],
+                    "dim_order": [
+                        "batch",
+                        "y",
+                        "x",
+                        "embedding"
+                    ],
+                    "data_type": "float32"
+                },
+                "post_processing_function": null
+            }
+        ]
+    },
+    "assets": {
+        "weights": {
+            "href": "https://e2s.s3.eu-de.cloud-object-storage.appdomain.cloud/models/terratorch_prithvi_eo_v2_600.pt",
+            "title": "Model",
+            "description": "Torch model weights for Prithvi EO v2 600M integrated in TerraTorch.",
+            "type": "application/octet-stream; application=pytorch",
+            "roles": [
+                "mlm:model",
+                "mlm:weights"
+            ],
+            "mlm:artifact_type": "torch.jit.save",
+            "raster:bands": [
+                {
+                    "name": "blue",
+                    "nodata": 0,
+                    "data_type": "uint16",
+                    "bits_per_sample": 15,
+                    "spatial_resolution": 10,
+                    "scale": 0.0001,
+                    "offset": 0,
+                    "unit": "m"
+                },
+                {
+                    "name": "green",
+                    "nodata": 0,
+                    "data_type": "uint16",
+                    "bits_per_sample": 15,
+                    "spatial_resolution": 10,
+                    "scale": 0.0001,
+                    "offset": 0,
+                    "unit": "m"
+                },
+                {
+                    "name": "red",
+                    "nodata": 0,
+                    "data_type": "uint16",
+                    "bits_per_sample": 15,
+                    "spatial_resolution": 10,
+                    "scale": 0.0001,
+                    "offset": 0,
+                    "unit": "m"
+                },
+                {
+                    "name": "nir_narrow",
+                    "nodata": 0,
+                    "data_type": "uint16",
+                    "bits_per_sample": 15,
+                    "spatial_resolution": 20,
+                    "scale": 0.0001,
+                    "offset": 0,
+                    "unit": "m"
+                },
+                {
+                    "name": "swir_1",
+                    "nodata": 0,
+                    "data_type": "uint16",
+                    "bits_per_sample": 15,
+                    "spatial_resolution": 20,
+                    "scale": 0.0001,
+                    "offset": 0,
+                    "unit": "m"
+                },
+                {
+                    "name": "swir_2",
+                    "nodata": 0,
+                    "data_type": "uint16",
+                    "bits_per_sample": 15,
+                    "spatial_resolution": 20,
+                    "scale": 0.0001,
+                    "offset": 0,
+                    "unit": "m"
+                }
+            ]
+        },
+        "readme": {
+            "href": "https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-600M/blob/main/README.md",
+            "title": "Model Card",
+            "type": "text/markdown",
+            "roles": [
+                "documentation"
+            ]
+        }
+    },
+    "links": []
+}
