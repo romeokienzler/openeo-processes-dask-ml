@@ -1,5 +1,4 @@
 import xarray as xr
-
 from pystac.extensions.mlm import ValueScaling, ValueScalingType
 
 

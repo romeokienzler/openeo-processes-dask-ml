@@ -3,11 +3,10 @@ import os
 import re
 from typing import Any
 
+import pystac
 import requests
 import requests.exceptions
 from stac_validator.validate import StacValidate
-
-import pystac
 
 AVAILABLE_ML_FRAMEWORKS: list[str] = []
 

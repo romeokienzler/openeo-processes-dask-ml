@@ -1,13 +1,13 @@
 import numpy as np
 import pytest
 import xarray as xr
+from pystac.extensions.mlm import ValueScaling, ValueScalingType
 
 from openeo_processes_dask_ml.process_implementations.utils.scaling_utils import (
     _raise_value_error,
     _validate_scaling_obj,
     scale_datacube,
 )
-from pystac.extensions.mlm import ValueScaling, ValueScalingType
 
 
 @pytest.fixture

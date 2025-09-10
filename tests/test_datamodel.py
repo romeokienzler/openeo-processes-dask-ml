@@ -3,18 +3,18 @@ from datetime import datetime
 
 import dask.array as da
 import numpy as np
+import pystac
 import pytest
 import xarray as xr
 from openeo_processes_dask.process_implementations.exceptions import (
     DimensionMismatch,
     DimensionMissing,
 )
+from pystac.extensions import mlm
 
-import pystac
 from openeo_processes_dask_ml.process_implementations.exceptions import (
     LabelDoesNotExist,
 )
-from pystac.extensions import mlm
 from tests.dummy.dummy_ml_model import DummyMLModel
 
 

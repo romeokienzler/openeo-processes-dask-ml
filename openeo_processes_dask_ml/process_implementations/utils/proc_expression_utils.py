@@ -1,11 +1,11 @@
 import importlib
 
 import xarray as xr
+from pystac.extensions.mlm import ProcessingExpression
 
 from openeo_processes_dask_ml.process_implementations.exceptions import (
     ExpressionEvaluationException,
 )
-from pystac.extensions.mlm import ProcessingExpression
 
 
 def _raise_format_not_implemented(f: str):

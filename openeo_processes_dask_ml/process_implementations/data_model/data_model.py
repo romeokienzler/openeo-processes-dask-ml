@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 
 import dask.delayed
 import numpy as np
+import pystac
 import xarray as xr
 import xarray.core.coordinates
 from dask import array as da
@@ -12,8 +13,8 @@ from openeo_processes_dask.process_implementations.exceptions import (
     DimensionMismatch,
     DimensionMissing,
 )
+from pystac.extensions.mlm import MLMExtension
 
-import pystac
 from openeo_processes_dask_ml.process_implementations.constants import MODEL_CACHE_DIR
 from openeo_processes_dask_ml.process_implementations.exceptions import (
     ExpressionEvaluationException,
@@ -28,7 +29,6 @@ from openeo_processes_dask_ml.process_implementations.utils import (
     proc_expression_utils,
     scaling_utils,
 )
-from pystac.extensions.mlm import MLMExtension
 
 logger = logging.getLogger(__name__)
 
@@ -604,6 +604,13 @@ class MLModel(ABC):
         except ValueError:
             # in case input has no batch dim: use 0
             batch_index = 0
+
+        # at this point we can say the following about the datacube
+        # datacube dims: [*dims_in_model (with batch dim), *dins_not_in_model]
+        # datacube shape:
+        #   - length of dimensions in model are as they need to be
+        #   - length of dimensions not in model are 1
+        datacube = datacube.squeeze()
 
         b_len = datacube.shape[batch_index]
 

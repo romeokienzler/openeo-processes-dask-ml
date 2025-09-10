@@ -1,7 +1,6 @@
 import numpy as np
-import torch
-
 import pystac
+import torch
 
 from .data_model import MLModel
 
@@ -33,9 +32,9 @@ class TorchModel(MLModel):
         with torch.no_grad():
             out = self._model_on_device(tensor)
 
-        self.postprocess_datacube_expression(out)
-
         out_postproc = self.postprocess_datacube_expression(out)
+        if out_postproc.device.type != "cpu":
+            out_postproc.cpu()
         out_cube = out_postproc.numpy()
 
         return out_cube

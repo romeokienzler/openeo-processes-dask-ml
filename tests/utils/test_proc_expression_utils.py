@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 import xarray as xr
+from pystac.extensions.mlm import ProcessingExpression
 
 from openeo_processes_dask_ml.process_implementations.utils import proc_expression_utils
-from pystac.extensions.mlm import ProcessingExpression
 
 
 @pytest.fixture

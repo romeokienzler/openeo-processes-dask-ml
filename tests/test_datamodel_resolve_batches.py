@@ -3,11 +3,11 @@ This model tests the resolve_batches() function from the datamodel.
 """
 
 import numpy as np
+import pystac
 import pytest
 import xarray as xr
 from dask import array as da
 
-import pystac
 from tests.dummy.dummy_ml_model import DummyMLModel
 
 
