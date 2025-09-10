@@ -135,7 +135,10 @@
                     ],
                     "data_type": "float32"
                 },
-                "post_processing_function": "mypackage.terratorch:postproc_prithvi_v2_backbone_output"
+                "post_processing_function": {
+                    "format": "python",
+                    "expression": "mypackage.terratorch:postproc_prithvi_v2_backbone_output"
+                }
             }
         ]
     },
