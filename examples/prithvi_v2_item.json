@@ -123,14 +123,10 @@
                 "result": {
                     "shape": [
                         -1,
-                        1,
-                        1,
                         1280
                     ],
                     "dim_order": [
                         "batch",
-                        "y",
-                        "x",
                         "embedding"
                     ],
                     "data_type": "float32"
