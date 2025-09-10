@@ -123,7 +123,7 @@
                 },
                 "post_processing_function": {
                     "format": "python",
-                    "expression": "mypackage.terratorch:postproc_backbone_output"
+                    "expression": "mypackage.terratorch:postproc_terramind_backbone_output"
                 }
             }
         ]
