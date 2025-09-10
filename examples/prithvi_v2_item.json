@@ -47,7 +47,7 @@
             "classification"
         ],
         "mlm:architecture": "Prithvi-EO v2 600M",
-        "mlm:framework": "pytorch",
+        "mlm:framework": "PyTorch",
         "mlm:framework_version": "2.3.0",
         "mlm:accelerator": "cuda",
         "mlm:input": [
@@ -125,7 +125,7 @@
                         -1,
                         1,
                         1,
-                        1024
+                        1280
                     ],
                     "dim_order": [
                         "batch",
@@ -135,7 +135,7 @@
                     ],
                     "data_type": "float32"
                 },
-                "post_processing_function": null
+                "post_processing_function": "mypackage.terratorch:postproc_prithvi_v2_backbone_output"
             }
         ]
     },
