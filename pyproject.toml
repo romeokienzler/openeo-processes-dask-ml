@@ -10,6 +10,8 @@ python = ">3.10,<3.12"
 openeo-processes-dask = {extras = ["implementations"], version = "^2025.2.1"}
 boto3 = "^1.38.14"
 stackstac = "^0.5.1"
+# remove this once mlm-extension is merged into upstream pystac, and openeo-processes-dask allows this as depdendency
+pystac = {git = "https://github.com/jonas-hurst/pystac", rev = "v1.11OWN"}
 
 
 [tool.poetry.group.dev.dependencies]
