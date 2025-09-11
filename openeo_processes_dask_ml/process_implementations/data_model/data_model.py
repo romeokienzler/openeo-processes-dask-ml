@@ -606,11 +606,17 @@ class MLModel(ABC):
             batch_index = 0
 
         # at this point we can say the following about the datacube
-        # datacube dims: [*dims_in_model (with batch dim), *dins_not_in_model]
+        # datacube dims: [*dims_in_model (with batch dim), *dims_not_in_model]
         # datacube shape:
-        #   - length of dimensions in model are as they need to be
+        #   - length of dimensions in model are as they need to be to satisfy model
         #   - length of dimensions not in model are 1
-        datacube = datacube.squeeze()
+
+        num_input_dims = len(self.model_metadata.input[0].input.shape)
+        num_datacube_dims = len(datacube.shape)
+        axes_to_squeeze = tuple(range(num_input_dims, num_datacube_dims))
+        datacube = datacube.squeeze(
+            axis=axes_to_squeeze
+        )  # todo: only squeeze not-in-model dims!!!
 
         b_len = datacube.shape[batch_index]
 
