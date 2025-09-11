@@ -34,7 +34,7 @@ class TorchModel(MLModel):
 
         out_postproc = self.postprocess_datacube_expression(out)
         if out_postproc.device.type != "cpu":
-            out_postproc.cpu()
+            out_postproc = out_postproc.cpu()
         out_cube = out_postproc.numpy()
 
         return out_cube
