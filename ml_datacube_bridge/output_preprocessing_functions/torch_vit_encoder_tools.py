@@ -44,14 +44,14 @@ def get_patch_embeddings_with_cls_square(t: list[torch.Tensor]) -> torch.Tensor:
     return _reorder_patch_embeddings(embedding_tensor)
 
 
-def postproc_terramind_backbone_output_full(t: list[torch.Tensor]) -> torch.Tensor:
-    samples_per_batch = int(t[0].numel() / (14 * 14 * 1024))
-    num_levels = len(t)
-
-    out_shape = (samples_per_batch, num_levels, 14, 14, 1024)
-    tensor_stack = torch.stack(t, dim=1).reshape(out_shape)
-
-    return tensor_stack
+# def postproc_terramind_backbone_output_full(t: list[torch.Tensor]) -> torch.Tensor:
+#     samples_per_batch = int(t[0].numel() / (14 * 14 * 1024))
+#     num_levels = len(t)
+#
+#     out_shape = (samples_per_batch, num_levels, 14, 14, 1024)
+#     tensor_stack = torch.stack(t, dim=1).reshape(out_shape)
+#
+#     return tensor_stack
 
 
 def get_image_cls_embedding_prepended_torch(t: list[torch.Tensor]) -> torch.Tensor:
