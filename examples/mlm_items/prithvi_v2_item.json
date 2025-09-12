@@ -116,24 +116,28 @@
         ],
         "mlm:output": [
             {
-                "name": "embedding vector",
+                "name": "per-patch embedding vectors",
                 "tasks": [
                     "classification"
                 ],
                 "result": {
                     "shape": [
                         -1,
+                        16,
+                        16,
                         1280
                     ],
                     "dim_order": [
                         "batch",
+                        "y",
+                        "x",
                         "embedding"
                     ],
                     "data_type": "float32"
                 },
                 "post_processing_function": {
                     "format": "python",
-                    "expression": "mypackage.terratorch:postproc_prithvi_v2_backbone_output"
+                    "expression": "ml_datacube_bridge.output_preprocessing_functions.torch_vit_encoder_tools:get_patch_embeddings_with_cls_square"
                 }
             }
         ]
