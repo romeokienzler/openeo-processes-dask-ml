@@ -44,7 +44,7 @@ def run_openeo_ml_predict(model_url: str):
             "load_model": {
                 "process_id": "load_ml_model",
                 "arguments": {
-                    "uri": model_uri,
+                    "uri": model_url,
                     "model_asset": "weights",
                 },
             },
@@ -78,5 +78,5 @@ if __name__ == "__main__":
         help="URI to the STAC-MLM file that catalogs the ML model to apply to the datacube.",
     )
     args = parser.parse_args()
-    model_uri = args.uri
-    run_openeo_ml_predict(model_uri)
+    uri = args.uri
+    run_openeo_ml_predict(uri)
