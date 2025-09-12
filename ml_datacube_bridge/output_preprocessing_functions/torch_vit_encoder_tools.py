@@ -56,7 +56,7 @@ def get_patch_embeddings_with_cls_square(t: list[torch.Tensor]) -> torch.Tensor:
 
 def get_image_cls_embedding_prepended_torch(t: list[torch.Tensor]) -> torch.Tensor:
     """
-    Returns the CLS embeddings, assuming the CLS embedding is at the first embedding (index 0)
+    Returns the CLS embeddings, assuming the CLS embedding is at the first embedding position (index 0)
     :param t: ViT encoder output, a list of
     :return: The CLS embedding per batch, shape is (batch_size, embedding_size)
     """
@@ -67,7 +67,7 @@ def get_image_cls_embedding_prepended_torch(t: list[torch.Tensor]) -> torch.Tens
 
 def get_image_cls_embedding_appended_torch(t: list[torch.Tensor]) -> torch.Tensor:
     """
-    Returns the CLS embeddings, assuming the CLS embedding is at the first embedding (index 0)
+    Returns the CLS embeddings, assuming the CLS embedding is at the last embedding position (index -1)
     :param t: ViT encoder output, a list of
     :return: The CLS embedding per batch, shape is (batch_size, embedding_size)
     """
