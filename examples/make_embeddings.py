@@ -67,6 +67,9 @@ def run_openeo_ml_predict(model_url: str):
 
 
 if __name__ == "__main__":
+    # call this script like this:
+    # python make_embeddings.py --uri https://link-to-stac/mlm-item.json
+
     parser = argparse.ArgumentParser(
         prog="MLonDatacube", description="Script to apply an ML model on a datacube."
     )
