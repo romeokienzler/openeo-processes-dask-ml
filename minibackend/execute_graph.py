@@ -8,3 +8,10 @@ def execute_graph(path: str):
     pg_callable = parsed_graph.to_callable(process_registry=process_registry)
     r = pg_callable()
     return r
+
+
+def execute_graph_dict(graph: dict):
+    parsed_graph = OpenEOProcessGraph(graph)
+    pg_callable = parsed_graph.to_callable(process_registry=process_registry)
+    r = pg_callable()
+    return r
