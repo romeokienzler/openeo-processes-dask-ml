@@ -12,7 +12,7 @@ def load_collection(
 ):
     msg = (
         "Process 'load_collection' not implemented. Returning random numbers instead. "
-        "#Use process 'load_stac' for real observations instead."
+        "Use process 'load_stac' for real observations instead."
     )
     logger.warning(msg)
 
