@@ -6,7 +6,7 @@ authors = ["Jonas Hurst <jhurst@uni-muenster.de>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = ">=3.11,<=3.13"
 openeo-processes-dask = {extras = ["implementations"], version = "^2025.7.1"}
 boto3 = "^1.38.14"
 stackstac = "^0.5.1"
